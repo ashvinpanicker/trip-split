@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import AuthListener from '@/components/auth/AuthListener';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -20,7 +21,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="h-full">
-      <body className="h-full antialiased bg-gray-50">{children}</body>
+      <body className="h-full antialiased bg-gray-50">
+          <AuthListener />
+          {children}
+        </body>
     </html>
   );
 }
