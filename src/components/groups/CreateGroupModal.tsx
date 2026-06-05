@@ -28,11 +28,14 @@ export default function CreateGroupModal({ open, onClose, onSuccess }: CreateGro
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const { data: group, error: groupErr } = await supabase
+    // Generate the ID client-side so we can add the member immediately
+    // without needing to SELECT the group back first (which would fail RLS
+    // because the user isn't a member yet at that point).
+    const groupId = crypto.randomUUID();
+
+    const { error: groupErr } = await supabase
       .from('groups')
-      .insert({ name: name.trim(), description: description.trim() || null, created_by: user.id })
-      .select()
-      .single();
+      .insert({ id: groupId, name: name.trim(), description: description.trim() || null, created_by: user.id });
 
     if (groupErr) {
       toast(groupErr.message, 'error');
@@ -40,9 +43,8 @@ export default function CreateGroupModal({ open, onClose, onSuccess }: CreateGro
       return;
     }
 
-    // Add creator as admin
     const { error: memberErr } = await supabase.from('group_members').insert({
-      group_id: group.id,
+      group_id: groupId,
       user_id: user.id,
       role: 'admin',
     });
