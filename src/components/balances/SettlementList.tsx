@@ -22,25 +22,21 @@ export default function SettlementList({ settlements, currentUserId }: Settlemen
   return (
     <div className="space-y-3">
       {settlements.map((s, i) => {
-        const isYouPaying = s.from_user_id === currentUserId;
-        const isYouReceiving = s.to_user_id === currentUserId;
+        const isYouPaying = s.from_id === currentUserId;
+        const isYouReceiving = s.to_id === currentUserId;
 
         return (
           <div
             key={i}
             className={`flex items-center gap-3 p-3 rounded-xl border ${
-              isYouPaying
-                ? 'bg-red-50 border-red-100'
-                : isYouReceiving
-                ? 'bg-green-50 border-green-100'
-                : 'bg-gray-50 border-gray-100'
+              isYouPaying ? 'bg-red-50 border-red-100' : isYouReceiving ? 'bg-green-50 border-green-100' : 'bg-gray-50 border-gray-100'
             }`}
           >
             <div className="flex items-center gap-2 flex-1 min-w-0">
-              <Avatar name={isYouPaying ? 'You' : s.from_user_name} size="sm" />
+              <Avatar name={isYouPaying ? 'You' : s.from_name} size="sm" />
               <div className="min-w-0">
                 <p className="text-sm font-medium text-gray-900 truncate">
-                  {isYouPaying ? 'You' : s.from_user_name}
+                  {isYouPaying ? 'You' : s.from_name}
                 </p>
                 <p className="text-xs text-gray-500">pays</p>
               </div>
@@ -54,11 +50,11 @@ export default function SettlementList({ settlements, currentUserId }: Settlemen
             <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
               <div className="min-w-0 text-right">
                 <p className="text-sm font-medium text-gray-900 truncate">
-                  {isYouReceiving ? 'You' : s.to_user_name}
+                  {isYouReceiving ? 'You' : s.to_name}
                 </p>
                 <p className="text-xs text-gray-500">receives</p>
               </div>
-              <Avatar name={isYouReceiving ? 'You' : s.to_user_name} size="sm" />
+              <Avatar name={isYouReceiving ? 'You' : s.to_name} size="sm" />
             </div>
           </div>
         );

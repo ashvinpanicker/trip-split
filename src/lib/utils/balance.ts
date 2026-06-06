@@ -1,19 +1,27 @@
-import type { Balance, Expense, ExpenseParticipant, Profile, Settlement } from '@/types';
+import type { Balance, Expense, ExpenseParticipant, Settlement } from '@/types';
+
+export interface BalancePerson {
+  id: string;         // user_id or pending_member id
+  name: string;
+  avatar_url?: string | null;
+  is_pending?: boolean;
+}
 
 export function calculateGroupBalances(
   expenses: (Expense & { participants: ExpenseParticipant[] })[],
-  members: Profile[]
+  persons: BalancePerson[]
 ): Balance[] {
-  // net[userId] = amount others owe them (positive) or they owe others (negative)
   const net: Record<string, number> = {};
-  for (const m of members) net[m.id] = 0;
+  for (const p of persons) net[p.id] = 0;
 
   for (const expense of expenses) {
     const payerId = expense.paid_by;
     if (!(payerId in net)) net[payerId] = 0;
 
     for (const participant of expense.participants) {
-      const uid = participant.user_id;
+      // Support both real users and pending members
+      const uid = participant.user_id ?? participant.pending_member_id;
+      if (!uid) continue;
       if (!(uid in net)) net[uid] = 0;
 
       if (uid !== payerId) {
@@ -23,11 +31,12 @@ export function calculateGroupBalances(
     }
   }
 
-  return members.map((m) => ({
-    user_id: m.id,
-    user_name: m.full_name || m.email,
-    avatar_url: m.avatar_url,
-    net_balance: Math.round((net[m.id] || 0) * 100) / 100,
+  return persons.map((p) => ({
+    person_id: p.id,
+    user_name: p.name,
+    avatar_url: p.avatar_url ?? null,
+    net_balance: Math.round((net[p.id] || 0) * 100) / 100,
+    is_pending: p.is_pending,
   }));
 }
 
@@ -43,8 +52,7 @@ export function simplifyDebts(balances: Balance[]): Settlement[] {
     .sort((a, b) => b.amount - a.amount);
 
   const settlements: Settlement[] = [];
-  let i = 0;
-  let j = 0;
+  let i = 0, j = 0;
 
   while (i < creditors.length && j < debtors.length) {
     const creditor = creditors[i];
@@ -53,17 +61,16 @@ export function simplifyDebts(balances: Balance[]): Settlement[] {
 
     if (amount > 0.01) {
       settlements.push({
-        from_user_id: debtor.user_id,
-        from_user_name: debtor.user_name,
-        to_user_id: creditor.user_id,
-        to_user_name: creditor.user_name,
+        from_id: debtor.person_id,
+        from_name: debtor.user_name,
+        to_id: creditor.person_id,
+        to_name: creditor.user_name,
         amount: Math.round(amount * 100) / 100,
       });
     }
 
     creditor.amount -= amount;
     debtor.amount -= amount;
-
     if (creditor.amount < 0.01) i++;
     if (debtor.amount < 0.01) j++;
   }
@@ -73,16 +80,15 @@ export function simplifyDebts(balances: Balance[]): Settlement[] {
 
 export function calculateEqualSplits(
   totalAmount: number,
-  participantIds: string[]
+  keys: string[]
 ): Record<string, number> {
-  const n = participantIds.length;
+  const n = keys.length;
   if (n === 0) return {};
   const base = Math.floor((totalAmount * 100) / n) / 100;
   const remainder = Math.round((totalAmount - base * n) * 100);
-
   const splits: Record<string, number> = {};
-  participantIds.forEach((id, idx) => {
-    splits[id] = base + (idx < remainder ? 0.01 : 0);
+  keys.forEach((k, idx) => {
+    splits[k] = base + (idx < remainder ? 0.01 : 0);
   });
   return splits;
 }
@@ -92,8 +98,8 @@ export function calculatePercentageSplits(
   percentages: Record<string, number>
 ): Record<string, number> {
   const splits: Record<string, number> = {};
-  for (const [id, pct] of Object.entries(percentages)) {
-    splits[id] = Math.round(totalAmount * (pct / 100) * 100) / 100;
+  for (const [k, pct] of Object.entries(percentages)) {
+    splits[k] = Math.round(totalAmount * (pct / 100) * 100) / 100;
   }
   return splits;
 }

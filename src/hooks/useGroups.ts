@@ -59,6 +59,9 @@ export function useGroup(groupId: string) {
         members:group_members(
           id, user_id, role, joined_at,
           profile:profiles(id, email, full_name, avatar_url)
+        ),
+        pending_members(
+          id, name, email, invite_token, claimed_by, claimed_at, created_at
         )
       `)
       .eq('id', groupId)

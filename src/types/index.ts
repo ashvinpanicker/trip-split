@@ -10,6 +10,18 @@ export interface Profile {
   updated_at: string;
 }
 
+export interface PendingMember {
+  id: string;
+  group_id: string;
+  name: string;
+  email: string | null;
+  invite_token: string;
+  claimed_by: string | null;
+  claimed_at: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
 export interface Group {
   id: string;
   name: string;
@@ -21,6 +33,7 @@ export interface Group {
   member_count?: number;
   total_expenses?: number;
   members?: GroupMember[];
+  pending_members?: PendingMember[];
 }
 
 export interface GroupMember {
@@ -51,40 +64,38 @@ export interface Expense {
 export interface ExpenseParticipant {
   id: string;
   expense_id: string;
-  user_id: string;
+  user_id: string | null;
+  pending_member_id: string | null;
   share_amount: number;
   share_percentage: number | null;
   profile?: Profile;
+  pending_member?: PendingMember;
 }
 
 export interface Balance {
-  user_id: string;
+  person_id: string;
   user_name: string;
   avatar_url: string | null;
-  net_balance: number; // positive = owed money, negative = owes money
+  net_balance: number;
+  is_pending?: boolean;
 }
 
 export interface Settlement {
-  from_user_id: string;
-  from_user_name: string;
-  to_user_id: string;
-  to_user_name: string;
+  from_id: string;
+  from_name: string;
+  to_id: string;
+  to_name: string;
   amount: number;
 }
 
-export interface ExpenseFormData {
-  title: string;
-  amount: string;
-  date: string;
-  paid_by: string;
-  split_type: SplitType;
-  notes: string;
-  participants: ParticipantInput[];
-}
-
-export interface ParticipantInput {
-  user_id: string;
-  amount?: string;
-  percentage?: string;
+// Unified participant entry used in the expense form
+export interface ParticipantEntry {
+  key: string;         // 'u:USER_ID' or 'p:PENDING_ID'
+  type: 'user' | 'pending';
+  id: string;
+  name: string;
+  avatar_url?: string | null;
   included: boolean;
+  amount: string;
+  percentage: string;
 }

@@ -56,6 +56,7 @@ export default function ExpenseCard({ expense, currentUserId, onDelete, onUpdate
     notes: expense.notes,
     participants: (expense.participants || []).map((p) => ({
       user_id: p.user_id,
+      pending_member_id: p.pending_member_id,
       share_amount: p.share_amount,
       share_percentage: p.share_percentage,
     })),
