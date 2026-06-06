@@ -52,22 +52,27 @@ export function useGroup(groupId: string) {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from('groups')
-      .select(`
-        *,
-        members:group_members(
-          id, user_id, role, joined_at,
-          profile:profiles(id, email, full_name, avatar_url)
-        ),
-        pending_members(
-          id, name, email, invite_token, claimed_by, claimed_at, created_at
-        )
-      `)
-      .eq('id', groupId)
-      .single();
 
-    setGroup(data as Group | null);
+    const [{ data }, { data: pendingData }] = await Promise.all([
+      supabase
+        .from('groups')
+        .select(`
+          *,
+          members:group_members(
+            id, user_id, role, joined_at,
+            profile:profiles(id, email, full_name, avatar_url)
+          )
+        `)
+        .eq('id', groupId)
+        .single(),
+      // Separate query so a missing table doesn't break the whole page
+      supabase
+        .from('pending_members')
+        .select('id, name, email, invite_token, claimed_by, claimed_at, created_at')
+        .eq('group_id', groupId),
+    ]);
+
+    setGroup(data ? { ...data, pending_members: pendingData ?? [] } as Group : null);
     setLoading(false);
   }, [groupId]);
 
