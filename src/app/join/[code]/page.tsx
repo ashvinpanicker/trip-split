@@ -2,7 +2,7 @@
 
 import { useEffect, useState, use } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { SplitSquareHorizontal, Users, Mail, Lock, User } from 'lucide-react';
+import { SplitSquareHorizontal, Users, Mail, Lock, User, Check } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
@@ -30,6 +30,9 @@ export default function JoinPage({ params }: { params: Promise<{ code: string }>
   const searchParams = useSearchParams();
   const personalToken = searchParams.get('for');
   const supabase = createClient();
+  const [pickedId, setPickedId] = useState<string | null>(searchParams.get('as'));
+  const [unclaimed, setUnclaimed] = useState<{ id: string; name: string }[]>([]);
+  const [signedInUser, setSignedInUser] = useState<string | null>(null);
 
   const [status, setStatus] = useState<Status>('loading');
   const [authMode, setAuthMode] = useState<AuthMode>('signup');
@@ -67,8 +70,27 @@ export default function JoinPage({ params }: { params: Promise<{ code: string }>
         }
       }
 
-      // If already signed in, join + claim immediately
+      // Shared group link: offer the names already added so people don't get duplicated
+      let names: { id: string; name: string }[] = [];
+      if (!personalToken) {
+        const { data } = await supabase.rpc('list_unclaimed_pending', { p_code: code });
+        names = (data as { id: string; name: string }[] | null) ?? [];
+        setUnclaimed(names);
+        const picked = names.find((n) => n.id === searchParams.get('as'));
+        if (picked) setName(picked.name);
+      }
+
       if (user) {
+        // Already a member? Just go in.
+        const { data: member } = await supabase
+          .from('group_members').select('id')
+          .eq('group_id', groupData[0].id).eq('user_id', user.id).maybeSingle();
+        // Signed in with names to pick from and no pick yet → show the picker first
+        if (!member && names.length > 0 && !searchParams.get('as')) {
+          setSignedInUser(user.id);
+          setStatus('ready');
+          return;
+        }
         await doJoin(user.id);
         return;
       }
@@ -91,9 +113,27 @@ export default function JoinPage({ params }: { params: Promise<{ code: string }>
         setStatus('success');
         setTimeout(() => router.replace(`/groups/${data.group_id}`), 1200);
       }
+    } else if (pickedId) {
+      const { data, error } = await supabase.rpc('claim_pending_by_id', { p_code: code, p_pending_id: pickedId });
+      if (error || data?.error) await joinByCode();
+      else {
+        setStatus('success');
+        setTimeout(() => router.replace(`/groups/${data.group_id}`), 1200);
+      }
     } else {
       await joinByCode();
     }
+  }
+
+  function returnPath() {
+    const q = personalToken ? `?for=${personalToken}` : pickedId ? `?as=${pickedId}` : '';
+    return encodeURIComponent(`/join/${code}${q}`);
+  }
+
+  function pick(id: string | null) {
+    setPickedId(id);
+    const n = unclaimed.find((u) => u.id === id);
+    if (n) setName(n.name);
   }
 
   async function joinByCode() {
@@ -125,7 +165,7 @@ export default function JoinPage({ params }: { params: Promise<{ code: string }>
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/api/auth/callback?next=/join/${code}${personalToken ? `?for=${personalToken}` : ''}`,
+        redirectTo: `${window.location.origin}/api/auth/callback?next=${returnPath()}`,
       },
     });
     if (error) { setFormError(error.message); setFormLoading(false); }
@@ -140,7 +180,10 @@ export default function JoinPage({ params }: { params: Promise<{ code: string }>
     if (authMode === 'signup') {
       const { data, error } = await supabase.auth.signUp({
         email, password,
-        options: { data: { full_name: name } },
+        options: {
+          data: { full_name: name },
+          emailRedirectTo: `${window.location.origin}/api/auth/callback?next=${returnPath()}`,
+        },
       });
       if (error) { setFormError(error.message); setFormLoading(false); return; }
 
@@ -241,6 +284,34 @@ export default function JoinPage({ params }: { params: Promise<{ code: string }>
           )}
         </div>
 
+        {unclaimed.length > 0 && (
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-4">
+            <p className="text-sm font-semibold text-gray-900">Which one are you?</p>
+            <p className="text-xs text-gray-500 mb-3">Pick your name so expenses already added for you come with you.</p>
+            <div className="flex flex-wrap gap-2">
+              {unclaimed.map((u) => (
+                <button
+                  key={u.id}
+                  type="button"
+                  onClick={() => pick(pickedId === u.id ? null : u.id)}
+                  className={`flex items-center gap-1 px-3 py-1.5 rounded-full border text-sm transition-colors ${
+                    pickedId === u.id ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200'
+                  }`}
+                >
+                  {pickedId === u.id && <Check size={13} />}
+                  {u.name}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-gray-400 mt-3">Not listed? Skip this and just join.</p>
+          </div>
+        )}
+
+        {signedInUser ? (
+          <Button fullWidth size="lg" onClick={() => doJoin(signedInUser)}>
+            {pickedId ? `Join as ${name}` : `Join ${groupInfo?.name}`}
+          </Button>
+        ) : (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           {/* Auth mode toggle */}
           <div className="flex border-b border-gray-100">
@@ -314,6 +385,7 @@ export default function JoinPage({ params }: { params: Promise<{ code: string }>
             </form>
           </div>
         </div>
+        )}
       </div>
     </div>
   );
