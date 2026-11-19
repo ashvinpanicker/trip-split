@@ -12,12 +12,8 @@
   --color-foreground: var(--foreground);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+/* App is designed light-only; stop dark-mode phones turning text white on white inputs */
+:root { color-scheme: light; }
 
 * {
   box-sizing: border-box;

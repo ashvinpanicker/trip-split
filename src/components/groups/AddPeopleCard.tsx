@@ -51,7 +51,7 @@ export default function AddPeopleCard({ groupId, existingNames, onAdded }: AddPe
           onChange={(e) => setValue(e.target.value)}
           placeholder="Jose, Rahul, Kiran…"
           autoCapitalize="words"
-          className="flex-1 min-w-0 h-10 px-3 rounded-xl border border-gray-200 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="flex-1 min-w-0 h-10 px-3 rounded-xl border border-gray-200 bg-white text-gray-900 placeholder:text-gray-400 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <button
           type="submit"
