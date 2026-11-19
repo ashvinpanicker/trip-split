@@ -2,7 +2,8 @@
 
 import { useState, use } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Plus, Users, BarChart2, Receipt, Copy, Check } from 'lucide-react';
+import { ArrowLeft, Plus, Users, BarChart2, Receipt, Copy, Check, Trash2 } from 'lucide-react';
+import { format } from 'date-fns';
 import AppHeader from '@/components/layout/AppHeader';
 import Button from '@/components/ui/Button';
 import EmptyState from '@/components/ui/EmptyState';
@@ -14,9 +15,11 @@ import InviteCard from '@/components/groups/InviteCard';
 import BalanceList from '@/components/balances/BalanceList';
 import SettlementList from '@/components/balances/SettlementList';
 import { useGroup } from '@/hooks/useGroups';
-import { useExpenses } from '@/hooks/useExpenses';
+import { useExpenses, useSettlements } from '@/hooks/useExpenses';
+import { createClient } from '@/lib/supabase/client';
+import { useToast } from '@/components/ui/Toast';
 import { useUser } from '@/hooks/useUser';
-import { calculateGroupBalances, simplifyDebts, formatCurrency, type BalancePerson } from '@/lib/utils/balance';
+import { calculateGroupBalances, simplifyDebts, formatCurrency, categoryOf, type BalancePerson } from '@/lib/utils/balance';
 import type { Expense, ExpenseParticipant } from '@/types';
 
 type Tab = 'expenses' | 'balances' | 'members';
@@ -41,6 +44,8 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
   const { user } = useUser();
   const { group, loading: groupLoading, refetch: refetchGroup } = useGroup(id);
   const { expenses, loading: expLoading, refetch: refetchExpenses } = useExpenses(id);
+  const { settlements: payments, refetch: refetchPayments } = useSettlements(id);
+  const { toast } = useToast();
   const [tab, setTab] = useState<Tab>('expenses');
   const [showAddExpense, setShowAddExpense] = useState(false);
 
@@ -65,14 +70,36 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
     .map((pm: any) => ({ id: pm.id, name: pm.name, is_pending: true }));
 
   const allPersons = [...realMembers, ...pendingMembers];
+  const nameOf = (pid: string) =>
+    pid === user.id ? 'You' : allPersons.find((p) => p.id === pid)?.name ?? 'Someone';
+
+  const upiIds: Record<string, string | null> = {};
+  for (const m of group.members || []) upiIds[m.user_id] = (m.profile as any)?.upi_id ?? null;
 
   const expensesWithParts = expenses.filter((e) => e.participants) as (Expense & { participants: ExpenseParticipant[] })[];
-  const balances = calculateGroupBalances(expensesWithParts, allPersons);
+  const balances = calculateGroupBalances(expensesWithParts, allPersons, payments);
   const settlements = simplifyDebts(balances);
   const totalExpenses = expenses.reduce((s, e) => s + Number(e.amount), 0);
   const myBalance = balances.find((b) => b.person_id === user.id);
+  const myTotalShare = expensesWithParts.reduce(
+    (s, e) => s + Number(e.participants.find((p) => p.user_id === user.id)?.share_amount ?? 0), 0);
 
-  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://trip-split-cyan-five.vercel.app';
+  const byCategory = Object.entries(
+    expenses.reduce<Record<string, number>>((acc, e) => {
+      const k = categoryOf(e.category).key;
+      acc[k] = (acc[k] || 0) + Number(e.amount);
+      return acc;
+    }, {})
+  ).sort((a, b) => b[1] - a[1]);
+
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+
+  async function deletePayment(paymentId: string) {
+    if (!confirm('Delete this payment record?')) return;
+    const { error } = await createClient().from('settlements').delete().eq('id', paymentId);
+    if (error) toast(error.message, 'error');
+    else { toast('Payment deleted'); refetchPayments(); }
+  }
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -105,11 +132,8 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
             </p>
           </div>
           <div className="flex-1">
-            <p className="text-xs text-gray-500">Members</p>
-            <p className="font-bold text-gray-900">
-              {realMembers.length}
-              {pendingMembers.length > 0 && <span className="text-amber-500 text-xs ml-1">+{pendingMembers.length}</span>}
-            </p>
+            <p className="text-xs text-gray-500">My Share</p>
+            <p className="font-bold text-gray-900">{formatCurrency(myTotalShare)}</p>
           </div>
         </div>
       </div>
@@ -169,9 +193,62 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
               <BalanceList balances={balances} currentUserId={user.id} />
             </Card>
             <Card>
-              <h3 className="font-semibold text-gray-900 mb-3">Suggested Settlements</h3>
-              <SettlementList settlements={settlements} currentUserId={user.id} />
+              <h3 className="font-semibold text-gray-900 mb-3">Settle Up</h3>
+              <SettlementList
+                settlements={settlements}
+                currentUserId={user.id}
+                groupId={id}
+                groupName={group.name}
+                upiIds={upiIds}
+                onRecorded={refetchPayments}
+              />
             </Card>
+
+            {payments.length > 0 && (
+              <Card padding="none">
+                <h3 className="font-semibold text-gray-900 px-4 pt-4 pb-2">Payments Recorded</h3>
+                {payments.map((p) => (
+                  <div key={p.id} className="flex items-center gap-3 px-4 py-2.5 border-t border-gray-50">
+                    <span className="text-lg">💸</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-gray-900 truncate">
+                        {nameOf(p.from_person)} → {nameOf(p.to_person)}
+                      </p>
+                      <p className="text-xs text-gray-500">{format(new Date(p.date), 'MMM d')}</p>
+                    </div>
+                    <span className="text-sm font-semibold text-gray-900">{formatCurrency(p.amount)}</span>
+                    <button onClick={() => deletePayment(p.id)} className="p-1.5 text-gray-300 hover:text-red-500">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+              </Card>
+            )}
+
+            {byCategory.length > 0 && (
+              <Card>
+                <h3 className="font-semibold text-gray-900 mb-3">Where the money went</h3>
+                <div className="space-y-2.5">
+                  {byCategory.map(([k, amt]) => {
+                    const c = categoryOf(k);
+                    return (
+                      <div key={k}>
+                        <div className="flex justify-between text-sm mb-1">
+                          <span className="text-gray-700">{c.emoji} {c.label}</span>
+                          <span className="font-medium text-gray-900">{formatCurrency(amt)}</span>
+                        </div>
+                        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                          <div className="h-full bg-blue-500 rounded-full" style={{ width: `${(amt / totalExpenses) * 100}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <p className="text-xs text-gray-500 pt-1">
+                    {allPersons.length} people · avg {formatCurrency(allPersons.length ? totalExpenses / allPersons.length : 0)} per head
+                  </p>
+                </div>
+              </Card>
+            )}
           </div>
         )}
 

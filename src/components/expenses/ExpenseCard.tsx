@@ -6,7 +6,7 @@ import { MoreVertical, Edit2, Trash2, ChevronDown, ChevronUp } from 'lucide-reac
 import { createClient } from '@/lib/supabase/client';
 import Avatar from '@/components/ui/Avatar';
 import { useToast } from '@/components/ui/Toast';
-import { formatCurrency } from '@/lib/utils/balance';
+import { formatCurrency, categoryOf, payerIdOf } from '@/lib/utils/balance';
 import type { Expense } from '@/types';
 import AddExpenseModal from './AddExpenseModal';
 
@@ -26,8 +26,12 @@ export default function ExpenseCard({ expense, currentUserId, onDelete, onUpdate
   const [deleting, setDeleting] = useState(false);
 
   const payer = expense.payer as any;
-  const payerName = payer?.full_name || payer?.email || 'Unknown';
+  const payerName = payer?.id === currentUserId
+    ? 'You'
+    : payer?.full_name || payer?.email || expense.payer_pending?.name || 'Unknown';
+  const payerId = payerIdOf(expense);
   const isMyExpense = expense.paid_by === currentUserId;
+  const cat = categoryOf(expense.category);
 
   const myParticipation = expense.participants?.find((p) => p.user_id === currentUserId);
   const myShare = myParticipation?.share_amount ?? 0;
@@ -52,6 +56,8 @@ export default function ExpenseCard({ expense, currentUserId, onDelete, onUpdate
     amount: expense.amount,
     date: expense.date,
     paid_by: expense.paid_by,
+    paid_by_pending: expense.paid_by_pending,
+    category: expense.category,
     split_type: expense.split_type,
     notes: expense.notes,
     participants: (expense.participants || []).map((p) => ({
@@ -67,14 +73,14 @@ export default function ExpenseCard({ expense, currentUserId, onDelete, onUpdate
       <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
         <div className="flex items-start gap-3 p-4">
           <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center flex-shrink-0">
-            <span className="text-lg">🧾</span>
+            <span className="text-lg">{cat.emoji}</span>
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <p className="font-semibold text-gray-900 truncate">{expense.title}</p>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  {format(new Date(expense.date), 'MMM d, yyyy')} · {payerName} paid
+                  {format(new Date(expense.date), 'MMM d')} · {payerName} paid
                 </p>
               </div>
               <div className="flex items-center gap-1 flex-shrink-0">
@@ -136,13 +142,14 @@ export default function ExpenseCard({ expense, currentUserId, onDelete, onUpdate
             <div className="space-y-2">
               {expense.participants.map((p) => {
                 const profile = p.profile as any;
-                const name = profile?.full_name || profile?.email || 'Unknown';
+                const name = profile?.full_name || profile?.email || p.pending_member?.name || 'Unknown';
+                const pid = p.user_id ?? p.pending_member_id;
                 return (
-                  <div key={p.user_id} className="flex items-center justify-between">
+                  <div key={pid ?? p.id} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Avatar src={profile?.avatar_url} name={name} size="xs" />
                       <span className="text-sm text-gray-700">{name}</span>
-                      {p.user_id === expense.paid_by && (
+                      {pid === payerId && (
                         <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">paid</span>
                       )}
                     </div>

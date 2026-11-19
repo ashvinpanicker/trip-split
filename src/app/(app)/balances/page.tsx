@@ -28,10 +28,10 @@ export default function BalancesPage() {
       setLoading(true);
       const groupIds = groups.map((g) => g.id);
 
-      const [{ data: expensesData }, { data: membersData }, { data: pendingData }] = await Promise.all([
+      const [{ data: expensesData }, { data: membersData }, { data: pendingData }, { data: paymentsData }] = await Promise.all([
         supabase
           .from('expenses')
-          .select(`id, group_id, paid_by, amount, split_type, date,
+          .select(`id, group_id, paid_by, paid_by_pending, amount, split_type, date,
             participants:expense_participants(user_id, pending_member_id, share_amount, share_percentage)`)
           .in('group_id', groupIds),
         supabase
@@ -43,6 +43,10 @@ export default function BalancesPage() {
           .select('id, name')
           .in('group_id', groupIds)
           .is('claimed_by', null),
+        supabase
+          .from('settlements')
+          .select('from_person, to_person, amount')
+          .in('group_id', groupIds),
       ]);
 
       const uniquePersons: Record<string, BalancePerson> = {};
@@ -57,8 +61,9 @@ export default function BalancesPage() {
       const expenses = (expensesData || []) as (Expense & { participants: ExpenseParticipant[] })[];
       const persons = Object.values(uniquePersons);
 
-      setAllBalances(calculateGroupBalances(expenses, persons));
-      setAllSettlements(simplifyDebts(calculateGroupBalances(expenses, persons)));
+      const balances = calculateGroupBalances(expenses, persons, paymentsData || []);
+      setAllBalances(balances);
+      setAllSettlements(simplifyDebts(balances));
       setLoading(false);
     }
 

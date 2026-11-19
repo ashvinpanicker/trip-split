@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { Calendar, Check, UserPlus, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
-import { calculateEqualSplits, calculatePercentageSplits } from '@/lib/utils/balance';
+import { calculateEqualSplits, calculatePercentageSplits, CATEGORIES } from '@/lib/utils/balance';
 import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
@@ -22,7 +22,9 @@ interface AddExpenseModalProps {
     title: string;
     amount: number;
     date: string;
-    paid_by: string;
+    paid_by: string | null;
+    paid_by_pending?: string | null;
+    category?: string | null;
     split_type: SplitType;
     notes: string | null;
     participants: { user_id: string | null; pending_member_id: string | null; share_amount: number; share_percentage: number | null }[];
@@ -46,7 +48,8 @@ export default function AddExpenseModal({
   const [title, setTitle] = useState(expense?.title ?? '');
   const [amount, setAmount] = useState(expense?.amount?.toString() ?? '');
   const [date, setDate] = useState(expense?.date ?? format(new Date(), 'yyyy-MM-dd'));
-  const [paidBy, setPaidBy] = useState(expense?.paid_by ?? '');
+  const [paidBy, setPaidBy] = useState(expense?.paid_by ?? expense?.paid_by_pending ?? '');
+  const [category, setCategory] = useState(expense?.category ?? 'food');
   const [splitType, setSplitType] = useState<SplitType>(expense?.split_type ?? 'equal');
   const [notes, setNotes] = useState(expense?.notes ?? '');
   const [participants, setParticipants] = useState<ParticipantEntry[]>([]);
@@ -99,7 +102,7 @@ export default function AddExpenseModal({
           id: m.user_id,
           name: p?.full_name || p?.email || 'Unknown',
           avatar_url: p?.avatar_url,
-          included: existing ? true : true,
+          included: expense ? !!existing : true,
           amount: existing ? existing.share_amount.toString() : '',
           percentage: existing?.share_percentage?.toString() ?? '',
         });
@@ -112,7 +115,7 @@ export default function AddExpenseModal({
           type: 'pending',
           id: pm.id,
           name: pm.name,
-          included: !!existing,
+          included: expense ? !!existing : true,
           amount: existing ? existing.share_amount.toString() : '',
           percentage: existing?.share_percentage?.toString() ?? '',
         });
@@ -217,6 +220,11 @@ export default function AddExpenseModal({
     const included = getIncluded();
 
     try {
+      const payer = participants.find((p) => p.id === paidBy);
+      const payerFields = payer?.type === 'pending'
+        ? { paid_by: null, paid_by_pending: paidBy }
+        : { paid_by: paidBy, paid_by_pending: null };
+
       const participantsData = included.map((p) => ({
         user_id: p.type === 'user' ? p.id : null,
         pending_member_id: p.type === 'pending' ? p.id : null,
@@ -227,7 +235,7 @@ export default function AddExpenseModal({
       if (isEditing && expense) {
         const { error: expErr } = await supabase
           .from('expenses')
-          .update({ title, amount: parseFloat(amount), date, paid_by: paidBy, split_type: splitType, notes: notes || null })
+          .update({ title, amount: parseFloat(amount), date, ...payerFields, category, split_type: splitType, notes: notes || null })
           .eq('id', expense.id);
         if (expErr) throw expErr;
 
@@ -244,7 +252,7 @@ export default function AddExpenseModal({
           .insert({
             group_id: selectedGroupId,
             title, amount: parseFloat(amount), date,
-            paid_by: paidBy, split_type: splitType,
+            ...payerFields, category, split_type: splitType,
             notes: notes || null, created_by: user!.id,
           })
           .select('id')
@@ -270,13 +278,12 @@ export default function AddExpenseModal({
 
   function resetForm() {
     setTitle(''); setAmount(''); setDate(format(new Date(), 'yyyy-MM-dd'));
-    setPaidBy(''); setSplitType('equal'); setNotes('');
+    setPaidBy(''); setSplitType('equal'); setNotes(''); setCategory('food');
     setParticipants([]); setShowAddPerson(false); setNewPersonName('');
     if (!initialGroupId) { setStep('group'); setSelectedGroupId(null); }
   }
 
   const shares = computeShares();
-  const realMembers = participants.filter((p) => p.type === 'user');
 
   // ── Group picker step ──────────────────────────────────────
   if (step === 'group') {
@@ -321,6 +328,7 @@ export default function AddExpenseModal({
           <Input
             label="Amount (₹)"
             type="number"
+            inputMode="decimal"
             placeholder="0.00"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
@@ -339,11 +347,30 @@ export default function AddExpenseModal({
           />
         </div>
 
-        {/* Paid by — only real members can be payer */}
+        {/* Category */}
+        <div>
+          <label className="text-sm font-medium text-gray-700 mb-2 block">Category</label>
+          <div className="flex gap-2 overflow-x-auto -mx-4 px-4 pb-1 no-scrollbar">
+            {CATEGORIES.map((c) => (
+              <button
+                key={c.key}
+                type="button"
+                onClick={() => setCategory(c.key)}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-full border text-sm whitespace-nowrap transition-colors ${
+                  category === c.key ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200'
+                }`}
+              >
+                <span>{c.emoji}</span>{c.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Paid by — anyone in the group, including people who haven't signed up */}
         <div>
           <label className="text-sm font-medium text-gray-700 mb-2 block">Paid by</label>
           <div className="flex gap-2 flex-wrap">
-            {realMembers.map((m) => (
+            {participants.map((m) => (
               <button
                 key={m.key}
                 type="button"
@@ -355,7 +382,7 @@ export default function AddExpenseModal({
                 }`}
               >
                 <Avatar src={m.avatar_url} name={m.name} size="xs" />
-                {m.name.split(' ')[0]}
+                {m.id === currentUserId ? 'You' : m.name.split(' ')[0]}
               </button>
             ))}
           </div>
@@ -384,9 +411,21 @@ export default function AddExpenseModal({
 
         {/* Participants */}
         <div>
-          <label className="text-sm font-medium text-gray-700 mb-2 block">
-            Participants ({getIncluded().length}/{participants.length})
-          </label>
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-sm font-medium text-gray-700">
+              Split between ({getIncluded().length}/{participants.length})
+            </label>
+            <button
+              type="button"
+              onClick={() => {
+                const all = participants.every((p) => p.included);
+                setParticipants((prev) => prev.map((p) => ({ ...p, included: !all })));
+              }}
+              className="text-xs font-medium text-blue-600"
+            >
+              {participants.every((p) => p.included) ? 'Select none' : 'Select all'}
+            </button>
+          </div>
           <div className="space-y-2">
             {participants.map((p) => {
               const share = shares[p.key];

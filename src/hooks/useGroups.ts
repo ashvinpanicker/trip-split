@@ -60,7 +60,7 @@ export function useGroup(groupId: string) {
           *,
           members:group_members(
             id, user_id, role, joined_at,
-            profile:profiles(id, email, full_name, avatar_url)
+            profile:profiles(id, email, full_name, avatar_url, upi_id)
           )
         `)
         .eq('id', groupId)

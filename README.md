@@ -11,7 +11,10 @@ A mobile-first expense sharing app built with Next.js 16, Supabase, and Tailwind
 - **Expenses** — Add, edit, delete expenses with title, amount, date, payer, participants, notes
 - **Split types** — Equal, percentage, and fixed amount splits
 - **Balances** — Net balances per user, simplified debt settlements
-- **Mobile-first** — Bottom nav, responsive, clean design
+- **Settle up** — Record payments ("Mark paid") so balances actually clear; one-tap **Pay via UPI** when the receiver has a UPI ID in their profile
+- **People without accounts** — Add friends by name; they can be in splits *and* be the payer. Their history moves over when they claim their invite link
+- **Categories** — Food, drinks, stay, travel, activities… with a "where the money went" breakdown
+- **Mobile-first** — Bottom nav, installable to home screen (PWA)
 
 ---
 
@@ -22,7 +25,7 @@ A mobile-first expense sharing app built with Next.js 16, Supabase, and Tailwind
 | Frontend | Next.js 16 (App Router), React, TypeScript |
 | Styling | Tailwind CSS v4 |
 | Backend | Supabase (Auth, PostgreSQL, RLS) |
-| Deployment | Vercel |
+| Deployment | Cloudflare Workers (OpenNext adapter) |
 
 ---
 
@@ -76,16 +79,17 @@ All tables use Row Level Security (RLS). Users only see data for groups they bel
 ### 1. Create a Supabase Project
 
 1. Go to [supabase.com](https://supabase.com) and create a project
-2. In **SQL Editor**, run `supabase/schema.sql`
+2. In **SQL Editor**, run these in order: `supabase/schema.sql`, `supabase/fix_rls_recursion.sql`, `supabase/add_pending_members.sql`, `supabase/goa_upgrade.sql`
+   (Existing database? Just run `supabase/goa_upgrade.sql` — it's safe to re-run.)
 3. In **Authentication > Providers**, enable Email and Google OAuth
 4. In **Authentication > URL Configuration**, set:
-   - Site URL: `https://your-app.vercel.app`
-   - Redirect URLs: `https://your-app.vercel.app/api/auth/callback`
+   - Site URL: `https://trip-split.<your-subdomain>.workers.dev`
+   - Redirect URLs: `https://trip-split.<your-subdomain>.workers.dev/api/auth/callback**`
 
 ### 2. Configure Environment
 
 ```bash
-cp .env.local.example .env.local
+cp .env.example .env.local
 ```
 
 ```env
@@ -102,16 +106,29 @@ npm run dev
 
 ---
 
-## Deploy to Vercel
+## Deploy to Cloudflare
+
+Uses [`@opennextjs/cloudflare`](https://opennext.js.org/cloudflare). Config lives in `wrangler.jsonc` and `open-next.config.ts`.
+
+**Option A — Git integration (auto-deploys on push)**
+
+1. Cloudflare dashboard → **Workers & Pages → Create → Import a repository** → pick this repo
+2. Build command: `npx opennextjs-cloudflare build`
+3. Deploy command: `npx opennextjs-cloudflare deploy`
+4. Under **Build variables**, add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` (they're baked in at build time)
+
+**Option B — from your laptop**
 
 ```bash
-npm i -g vercel
-vercel
+npx wrangler login
+npm run deploy      # reads .env.local
 ```
 
-Or import the GitHub repo at [vercel.com/new](https://vercel.com/new) and add the two env vars.
+Test locally in the Workers runtime with `npm run preview`.
 
-After deploy, update Supabase redirect URLs to your production domain.
+After the first deploy, put the `*.workers.dev` URL into Supabase's Site URL and Redirect URLs.
+
+> Note: auth guard lives in `src/middleware.ts` (not `proxy.ts`) because OpenNext's support for Next 16's Node-runtime proxy is still experimental on Cloudflare.
 
 ---
 
@@ -119,7 +136,7 @@ After deploy, update Supabase redirect URLs to your production domain.
 
 The engine in `src/lib/utils/balance.ts`:
 
-1. **Net balance per user** — Credit payer for others' shares, debit each participant
+1. **Net balance per user** — Credit payer for others' shares, debit each participant, then apply recorded payments
 2. **Simplified settlements** — Greedy min-transactions algorithm
 
 **Example:** Ashvin paid ₹4000 for 4 people (equal split = ₹1000 each).

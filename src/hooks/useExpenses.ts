@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import type { Expense } from '@/types';
+import type { Expense, SettlementRecord } from '@/types';
 
 export function useExpenses(groupId: string) {
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -15,10 +15,12 @@ export function useExpenses(groupId: string) {
       .from('expenses')
       .select(`
         *,
-        payer:profiles!expenses_paid_by_fkey(id, email, full_name, avatar_url),
+        payer:profiles!expenses_paid_by_fkey(id, email, full_name, avatar_url, upi_id),
+        payer_pending:pending_members!expenses_paid_by_pending_fkey(id, name),
         participants:expense_participants(
-          id, user_id, share_amount, share_percentage,
-          profile:profiles(id, email, full_name, avatar_url)
+          id, user_id, pending_member_id, share_amount, share_percentage,
+          profile:profiles(id, email, full_name, avatar_url),
+          pending_member:pending_members(id, name)
         )
       `)
       .eq('group_id', groupId)
@@ -29,7 +31,12 @@ export function useExpenses(groupId: string) {
     setLoading(false);
   }, [groupId]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    const onChange = () => load();
+    window.addEventListener('tripsplit:expenses-changed', onChange);
+    return () => window.removeEventListener('tripsplit:expenses-changed', onChange);
+  }, [load]);
 
   return { expenses, loading, refetch: load };
 }
@@ -59,9 +66,11 @@ export function useAllExpenses() {
         .select(`
           *,
           payer:profiles!expenses_paid_by_fkey(id, email, full_name, avatar_url),
+          payer_pending:pending_members!expenses_paid_by_pending_fkey(id, name),
           participants:expense_participants(
-            id, user_id, share_amount, share_percentage,
-            profile:profiles(id, email, full_name, avatar_url)
+            id, user_id, pending_member_id, share_amount, share_percentage,
+            profile:profiles(id, email, full_name, avatar_url),
+            pending_member:pending_members(id, name)
           )
         `)
         .in('group_id', groupIds)
@@ -76,4 +85,24 @@ export function useAllExpenses() {
   }, []);
 
   return { expenses, loading };
+}
+
+export function useSettlements(groupId: string) {
+  const [settlements, setSettlements] = useState<SettlementRecord[]>([]);
+  const supabase = createClient();
+
+  const load = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('settlements')
+      .select('*')
+      .eq('group_id', groupId)
+      .order('date', { ascending: false })
+      .order('created_at', { ascending: false });
+    // Table missing (migration not run yet) → behave as "no payments recorded"
+    setSettlements(error ? [] : ((data || []) as SettlementRecord[]));
+  }, [groupId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  return { settlements, refetch: load };
 }

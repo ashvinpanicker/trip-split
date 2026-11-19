@@ -33,8 +33,11 @@ export async function updateSession(request: NextRequest) {
 
   const authPaths = ['/login', '/register'];
   const isAuthPath = authPaths.some((p) => pathname.startsWith(p));
+  // Invite links and the OAuth callback must work while logged out
+  const publicPaths = ['/join', '/api/auth'];
+  const isPublicPath = publicPaths.some((p) => pathname.startsWith(p));
 
-  if (!user && !isAuthPath) {
+  if (!user && !isAuthPath && !isPublicPath) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     return NextResponse.redirect(url);

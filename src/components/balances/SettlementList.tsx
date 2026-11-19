@@ -1,14 +1,30 @@
+'use client';
+
+import { useState } from 'react';
+import { ArrowRight, Check, Smartphone } from 'lucide-react';
 import Avatar from '@/components/ui/Avatar';
-import { ArrowRight } from 'lucide-react';
-import { formatCurrency } from '@/lib/utils/balance';
+import { useToast } from '@/components/ui/Toast';
+import { createClient } from '@/lib/supabase/client';
+import { formatCurrency, upiLink } from '@/lib/utils/balance';
 import type { Settlement } from '@/types';
 
 interface SettlementListProps {
   settlements: Settlement[];
   currentUserId: string;
+  /** When set, each row gets "Mark paid" (and UPI pay where possible). */
+  groupId?: string;
+  groupName?: string;
+  /** person id → UPI ID */
+  upiIds?: Record<string, string | null | undefined>;
+  onRecorded?: () => void;
 }
 
-export default function SettlementList({ settlements, currentUserId }: SettlementListProps) {
+export default function SettlementList({
+  settlements, currentUserId, groupId, groupName, upiIds = {}, onRecorded,
+}: SettlementListProps) {
+  const { toast } = useToast();
+  const [savingIdx, setSavingIdx] = useState<number | null>(null);
+
   if (settlements.length === 0) {
     return (
       <div className="text-center py-6">
@@ -19,46 +35,86 @@ export default function SettlementList({ settlements, currentUserId }: Settlemen
     );
   }
 
+  async function markPaid(s: Settlement, idx: number) {
+    if (!groupId) return;
+    const who = s.from_id === currentUserId ? 'you' : s.from_name;
+    if (!confirm(`Record that ${who} paid ${s.to_id === currentUserId ? 'you' : s.to_name} ${formatCurrency(s.amount)}?`)) return;
+    setSavingIdx(idx);
+    const supabase = createClient();
+    const { error } = await supabase.from('settlements').insert({
+      group_id: groupId,
+      from_person: s.from_id,
+      to_person: s.to_id,
+      amount: s.amount,
+      created_by: currentUserId,
+    });
+    setSavingIdx(null);
+    if (error) {
+      toast(error.message.includes('settlements') ? 'Run supabase/goa_upgrade.sql first' : error.message, 'error');
+      return;
+    }
+    toast('Payment recorded');
+    onRecorded?.();
+  }
+
   return (
     <div className="space-y-3">
       {settlements.map((s, i) => {
         const isYouPaying = s.from_id === currentUserId;
         const isYouReceiving = s.to_id === currentUserId;
+        const receiverUpi = upiIds[s.to_id];
 
         return (
           <div
-            key={i}
-            className={`flex items-center gap-3 p-3 rounded-xl border ${
+            key={`${s.from_id}-${s.to_id}`}
+            className={`p-3 rounded-xl border ${
               isYouPaying ? 'bg-red-50 border-red-100' : isYouReceiving ? 'bg-green-50 border-green-100' : 'bg-gray-50 border-gray-100'
             }`}
           >
-            <div className="flex items-center gap-2 flex-1 min-w-0">
-              <Avatar name={isYouPaying ? 'You' : s.from_name} size="sm" />
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">
-                  {isYouPaying ? 'You' : s.from_name}
-                </p>
-                <p className="text-xs text-gray-500">pays</p>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <Avatar name={isYouPaying ? 'You' : s.from_name} size="sm" />
+                <p className="text-sm font-medium text-gray-900 truncate">{isYouPaying ? 'You' : s.from_name}</p>
+              </div>
+              <div className="flex flex-col items-center">
+                <span className={`text-sm font-bold ${isYouPaying ? 'text-red-600' : isYouReceiving ? 'text-green-600' : 'text-gray-900'}`}>
+                  {formatCurrency(s.amount)}
+                </span>
+                <ArrowRight size={14} className="text-gray-400" />
+              </div>
+              <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
+                <p className="text-sm font-medium text-gray-900 truncate text-right">{isYouReceiving ? 'You' : s.to_name}</p>
+                <Avatar name={isYouReceiving ? 'You' : s.to_name} size="sm" />
               </div>
             </div>
-            <div className="flex flex-col items-center">
-              <ArrowRight size={16} className="text-gray-400" />
-              <span className={`text-sm font-bold ${isYouPaying ? 'text-red-600' : isYouReceiving ? 'text-green-600' : 'text-gray-900'}`}>
-                {formatCurrency(s.amount)}
-              </span>
-            </div>
-            <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
-              <div className="min-w-0 text-right">
-                <p className="text-sm font-medium text-gray-900 truncate">
-                  {isYouReceiving ? 'You' : s.to_name}
-                </p>
-                <p className="text-xs text-gray-500">receives</p>
+
+            {groupId && (
+              <div className="flex gap-2 mt-3">
+                {isYouPaying && receiverUpi && (
+                  <a
+                    href={upiLink(receiverUpi, s.to_name, s.amount, `${groupName ?? 'TripSplit'} settle-up`)}
+                    className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-lg bg-blue-600 text-white text-sm font-medium active:bg-blue-700"
+                  >
+                    <Smartphone size={14} /> Pay via UPI
+                  </a>
+                )}
+                <button
+                  onClick={() => markPaid(s, i)}
+                  disabled={savingIdx !== null}
+                  className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-lg bg-white border border-gray-200 text-gray-700 text-sm font-medium active:bg-gray-50 disabled:opacity-50"
+                >
+                  <Check size={14} /> {savingIdx === i ? 'Saving…' : 'Mark paid'}
+                </button>
               </div>
-              <Avatar name={isYouReceiving ? 'You' : s.to_name} size="sm" />
-            </div>
+            )}
           </div>
         );
       })}
+      {groupId && (
+        <p className="text-xs text-gray-400 text-center">
+          Add your UPI ID in Profile so friends can pay you in one tap.
+        </p>
+      )}
     </div>
   );
 }

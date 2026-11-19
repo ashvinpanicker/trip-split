@@ -1,4 +1,4 @@
-import type { Balance, Expense, ExpenseParticipant, Settlement } from '@/types';
+import type { Balance, Expense, ExpenseParticipant, Settlement, SettlementRecord } from '@/types';
 
 export interface BalancePerson {
   id: string;         // user_id or pending_member id
@@ -7,15 +7,22 @@ export interface BalancePerson {
   is_pending?: boolean;
 }
 
+/** Payer id for an expense — a real user, or a pending member if they paid before signing up. */
+export function payerIdOf(e: Pick<Expense, 'paid_by' | 'paid_by_pending'>): string | null {
+  return e.paid_by ?? e.paid_by_pending ?? null;
+}
+
 export function calculateGroupBalances(
-  expenses: (Expense & { participants: ExpenseParticipant[] })[],
-  persons: BalancePerson[]
+  expenses: (Pick<Expense, 'paid_by' | 'paid_by_pending'> & { participants: Pick<ExpenseParticipant, 'user_id' | 'pending_member_id' | 'share_amount'>[] })[],
+  persons: BalancePerson[],
+  settlements: Pick<SettlementRecord, 'from_person' | 'to_person' | 'amount'>[] = []
 ): Balance[] {
   const net: Record<string, number> = {};
   for (const p of persons) net[p.id] = 0;
 
   for (const expense of expenses) {
-    const payerId = expense.paid_by;
+    const payerId = payerIdOf(expense);
+    if (!payerId) continue;
     if (!(payerId in net)) net[payerId] = 0;
 
     for (const participant of expense.participants) {
@@ -25,10 +32,17 @@ export function calculateGroupBalances(
       if (!(uid in net)) net[uid] = 0;
 
       if (uid !== payerId) {
-        net[payerId] += participant.share_amount;
-        net[uid] -= participant.share_amount;
+        net[payerId] += Number(participant.share_amount);
+        net[uid] -= Number(participant.share_amount);
       }
     }
+  }
+
+  // Recorded payments: debtor paid creditor, so debtor's balance goes up
+  for (const s of settlements) {
+    const amt = Number(s.amount);
+    net[s.from_person] = (net[s.from_person] || 0) + amt;
+    net[s.to_person] = (net[s.to_person] || 0) - amt;
   }
 
   return persons.map((p) => ({
@@ -111,4 +125,30 @@ export function formatCurrency(amount: number): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(amount);
+}
+
+export const CATEGORIES = [
+  { key: 'food', label: 'Food', emoji: '🍛' },
+  { key: 'drinks', label: 'Drinks', emoji: '🍺' },
+  { key: 'stay', label: 'Stay', emoji: '🏠' },
+  { key: 'travel', label: 'Travel', emoji: '🛵' },
+  { key: 'activities', label: 'Activities', emoji: '🏄' },
+  { key: 'shopping', label: 'Shopping', emoji: '🛍️' },
+  { key: 'other', label: 'Other', emoji: '🧾' },
+] as const;
+
+export function categoryOf(key?: string | null) {
+  return CATEGORIES.find((c) => c.key === key) ?? CATEGORIES[CATEGORIES.length - 1];
+}
+
+/** UPI deep link — opens GPay/PhonePe/Paytm with payee + amount prefilled. */
+export function upiLink(upiId: string, name: string, amount: number, note: string) {
+  const params = new URLSearchParams({
+    pa: upiId.trim(),
+    pn: name,
+    am: amount.toFixed(2),
+    cu: 'INR',
+    tn: note.slice(0, 50),
+  });
+  return `upi://pay?${params.toString()}`;
 }

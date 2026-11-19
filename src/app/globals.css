@@ -45,3 +45,6 @@ body {
   background: #d1d5db;
   border-radius: 2px;
 }
+
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }

@@ -5,12 +5,14 @@ import './globals.css';
 export const metadata: Metadata = {
   title: 'TripSplit - Share Expenses Easily',
   description: 'Track and split shared expenses with friends and groups',
+  appleWebApp: { capable: true, title: 'TripSplit', statusBarStyle: 'default' },
 };
 
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
+  viewportFit: 'cover',
   themeColor: '#1a56db',
 };
 

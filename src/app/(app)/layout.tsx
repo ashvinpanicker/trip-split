@@ -1,12 +1,16 @@
 'use client';
 
 import { useState } from 'react';
+import { usePathname } from 'next/navigation';
 import BottomNav from '@/components/layout/BottomNav';
 import { ToastProvider } from '@/components/ui/Toast';
 import AddExpenseModal from '@/components/expenses/AddExpenseModal';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [showAddExpense, setShowAddExpense] = useState(false);
+  // On a group page, the centre "Add" button goes straight to that group's form
+  const groupMatch = usePathname().match(/^\/groups\/([0-9a-f-]{36})/);
+  const currentGroupId = groupMatch?.[1] ?? null;
 
   return (
     <ToastProvider>
@@ -16,9 +20,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </main>
         <BottomNav onAddExpense={() => setShowAddExpense(true)} />
         <AddExpenseModal
+          key={currentGroupId ?? 'any'}
           open={showAddExpense}
           onClose={() => setShowAddExpense(false)}
-          groupId={null}
+          groupId={currentGroupId}
+          onSuccess={() => window.dispatchEvent(new Event('tripsplit:expenses-changed'))}
         />
       </div>
     </ToastProvider>
