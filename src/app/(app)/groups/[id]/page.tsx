@@ -11,16 +11,15 @@ import Avatar from '@/components/ui/Avatar';
 import Card from '@/components/ui/Card';
 import ExpenseCard from '@/components/expenses/ExpenseCard';
 import AddExpenseModal from '@/components/expenses/AddExpenseModal';
+import SettleUpPanel from '@/components/balances/SettleUpPanel';
 import AddPeopleCard from '@/components/groups/AddPeopleCard';
 import InviteCard from '@/components/groups/InviteCard';
-import BalanceList from '@/components/balances/BalanceList';
-import SettlementList from '@/components/balances/SettlementList';
 import { useGroup } from '@/hooks/useGroups';
 import { useExpenses, useSettlements } from '@/hooks/useExpenses';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/components/ui/Toast';
 import { useUser } from '@/hooks/useUser';
-import { calculateGroupBalances, simplifyDebts, formatCurrency, categoryOf, type BalancePerson } from '@/lib/utils/balance';
+import { calculateGroupBalances, smartSettle, directDebts, formatCurrency, categoryOf, type BalancePerson } from '@/lib/utils/balance';
 import type { Expense, ExpenseParticipant } from '@/types';
 
 type Tab = 'expenses' | 'balances' | 'members';
@@ -79,7 +78,8 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
 
   const expensesWithParts = expenses.filter((e) => e.participants) as (Expense & { participants: ExpenseParticipant[] })[];
   const balances = calculateGroupBalances(expensesWithParts, allPersons, payments);
-  const settlements = simplifyDebts(balances);
+  const settlements = smartSettle(balances);
+  const directPlan = directDebts(expensesWithParts, allPersons, payments);
   const totalExpenses = expenses.reduce((s, e) => s + Number(e.amount), 0);
   const myBalance = balances.find((b) => b.person_id === user.id);
   const myTotalShare = expensesWithParts.reduce(
@@ -189,25 +189,20 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
         {/* Balances tab */}
         {tab === 'balances' && (
           <div className="space-y-4">
-            <Card>
-              <h3 className="font-semibold text-gray-900 mb-3">Net Balances</h3>
-              <BalanceList balances={balances} currentUserId={user.id} />
-            </Card>
-            <Card>
-              <h3 className="font-semibold text-gray-900 mb-3">Settle Up</h3>
-              <SettlementList
-                settlements={settlements}
-                currentUserId={user.id}
-                groupId={id}
-                groupName={group.name}
-                upiIds={upiIds}
-                onRecorded={refetchPayments}
-              />
-            </Card>
+            <SettleUpPanel
+              balances={balances}
+              smart={settlements}
+              direct={directPlan}
+              currentUserId={user.id}
+              groupId={id}
+              groupName={group.name}
+              upiIds={upiIds}
+              onRecorded={refetchPayments}
+            />
 
             {payments.length > 0 && (
               <Card padding="none">
-                <h3 className="font-semibold text-gray-900 px-4 pt-4 pb-2">Payments Recorded</h3>
+                <h3 className="font-semibold text-gray-900 px-4 pt-4 pb-2">Payments done ({payments.length})</h3>
                 {payments.map((p) => (
                   <div key={p.id} className="flex items-center gap-3 px-4 py-2.5 border-t border-gray-50">
                     <span className="text-lg">💸</span>

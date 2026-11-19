@@ -88,7 +88,19 @@ export default function SettlementList({
               </div>
             </div>
 
-            {groupId && (
+            {groupId && !(isYouPaying || isYouReceiving) && (
+              <div className="flex justify-end mt-1.5">
+                <button
+                  onClick={() => markPaid(s, i)}
+                  disabled={savingIdx !== null}
+                  className="text-xs font-medium text-gray-500 hover:text-blue-600 disabled:opacity-50"
+                >
+                  {savingIdx === i ? 'Saving…' : 'Mark paid'}
+                </button>
+              </div>
+            )}
+
+            {groupId && (isYouPaying || isYouReceiving) && (
               <div className="flex gap-2 mt-3">
                 {isYouPaying && receiverUpi && (
                   <a
@@ -103,7 +115,7 @@ export default function SettlementList({
                   disabled={savingIdx !== null}
                   className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-lg bg-white border border-gray-200 text-gray-700 text-sm font-medium active:bg-gray-50 disabled:opacity-50"
                 >
-                  <Check size={14} /> {savingIdx === i ? 'Saving…' : 'Mark paid'}
+                  <Check size={14} /> {savingIdx === i ? 'Saving…' : isYouReceiving ? 'Got it' : 'Mark paid'}
                 </button>
               </div>
             )}
@@ -112,7 +124,7 @@ export default function SettlementList({
       })}
       {groupId && (
         <p className="text-xs text-gray-400 text-center">
-          Add your UPI ID in Profile so friends can pay you in one tap.
+          Add your UPI ID in <a href="/profile" className="underline">Profile</a> so friends can pay you in one tap.
         </p>
       )}
     </div>
