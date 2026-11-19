@@ -94,7 +94,7 @@ export default function ProfilePage() {
                 </button>
               </div>
             )}
-            <p className="text-gray-500 text-sm mt-1">{user.email}</p>
+            <p className="text-gray-500 text-sm mt-1 truncate">{user.email}</p>
           </div>
         </Card>
 
@@ -104,7 +104,7 @@ export default function ProfilePage() {
             <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
               <User size={16} className="text-blue-600" />
             </div>
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
               <p className="text-xs text-gray-500">Full name</p>
               <p className="text-sm font-medium text-gray-900">{user.full_name || '—'}</p>
             </div>
@@ -113,9 +113,9 @@ export default function ProfilePage() {
             <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
               <Mail size={16} className="text-blue-600" />
             </div>
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
               <p className="text-xs text-gray-500">Email</p>
-              <p className="text-sm font-medium text-gray-900">{user.email}</p>
+              <p className="text-sm font-medium text-gray-900 truncate">{user.email}</p>
             </div>
           </div>
         </Card>

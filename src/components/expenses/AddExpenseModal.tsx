@@ -77,8 +77,10 @@ export default function AddExpenseModal({
     init();
   }, [open, initialGroupId]);
 
+  // Reload every time the sheet opens — the list can change (new names, people joining)
+  // and the first load can race the auth session and come back empty.
   useEffect(() => {
-    if (!selectedGroupId) return;
+    if (!open || !selectedGroupId) return;
     async function loadParticipants() {
       const { data: memberData } = await supabase
         .from('group_members')
@@ -125,7 +127,7 @@ export default function AddExpenseModal({
       if (!paidBy && currentUserId) setPaidBy(currentUserId);
     }
     loadParticipants();
-  }, [selectedGroupId, currentUserId, expense]);
+  }, [open, selectedGroupId, currentUserId, expense]);
 
   function toggleParticipant(key: string) {
     setParticipants((prev) =>
@@ -491,7 +493,7 @@ export default function AddExpenseModal({
                   onChange={(e) => setNewPersonName(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addNewPerson())}
                   placeholder="Their name (e.g. Priya)"
-                  className="flex-1 bg-transparent text-sm outline-none text-gray-900 placeholder:text-gray-400"
+                  className="flex-1 min-w-0 bg-transparent text-sm outline-none text-gray-900 placeholder:text-gray-400"
                   autoFocus
                 />
                 <button

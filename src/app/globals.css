@@ -15,6 +15,18 @@
 /* App is designed light-only; stop dark-mode phones turning text white on white inputs */
 :root { color-scheme: light; }
 
+/* No sideways scrolling on phones */
+html, body { max-width: 100%; overflow-x: clip; }
+
+/* iOS zooms (and pans sideways) when focusing inputs under 16px */
+@media (max-width: 640px) {
+  input, select, textarea { font-size: 16px !important; }
+}
+
+/* iOS date inputs ignore width and render wider than their column */
+input[type="date"] { min-width: 0; -webkit-appearance: none; }
+input[type="date"]::-webkit-date-and-time-value { text-align: left; }
+
 * {
   box-sizing: border-box;
 }

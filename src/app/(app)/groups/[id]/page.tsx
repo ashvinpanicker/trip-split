@@ -121,20 +121,20 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
 
       {/* Stats */}
       <div className="bg-white border-b border-gray-100 px-4 py-3">
-        <div className="flex gap-4">
-          <div className="flex-1">
+        <div className="flex gap-3">
+          <div className="flex-1 min-w-0">
             <p className="text-xs text-gray-500">Total Spent</p>
-            <p className="font-bold text-gray-900">{formatCurrency(totalExpenses)}</p>
+            <p className="font-bold text-gray-900 truncate">{formatCurrency(totalExpenses)}</p>
           </div>
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <p className="text-xs text-gray-500">My Balance</p>
-            <p className={`font-bold ${myBalance && myBalance.net_balance >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+            <p className={`font-bold truncate ${myBalance && myBalance.net_balance >= 0 ? 'text-green-600' : 'text-red-500'}`}>
               {myBalance ? (myBalance.net_balance >= 0 ? '+' : '') + formatCurrency(myBalance.net_balance) : '—'}
             </p>
           </div>
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <p className="text-xs text-gray-500">My Share</p>
-            <p className="font-bold text-gray-900">{formatCurrency(myTotalShare)}</p>
+            <p className="font-bold text-gray-900 truncate">{formatCurrency(myTotalShare)}</p>
           </div>
         </div>
       </div>
@@ -273,7 +273,7 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
                     <Avatar src={p?.avatar_url} name={name} size="md" />
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-gray-900 truncate">{name}</p>
-                      <p className="text-xs text-gray-500">{p?.email}</p>
+                      <p className="text-xs text-gray-500 truncate">{p?.email}</p>
                     </div>
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${m.role === 'admin' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
                       {m.role}
@@ -297,13 +297,13 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
                         <div className="flex items-center gap-3">
                           <Avatar name={pm.name} size="md" />
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium text-gray-900">{pm.name}</p>
+                            <p className="font-medium text-gray-900 truncate">{pm.name}</p>
                             <p className="text-xs text-amber-600">Hasn&apos;t joined yet</p>
                           </div>
                           <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">pending</span>
                         </div>
                         <div className="mt-2 flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
-                          <p className="text-xs text-gray-500 flex-1 truncate">{inviteUrl}</p>
+                          <p className="text-xs text-gray-500 flex-1 min-w-0 truncate">{inviteUrl}</p>
                           <CopyButton text={inviteUrl} />
                         </div>
                       </div>
