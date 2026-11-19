@@ -11,6 +11,7 @@ import Avatar from '@/components/ui/Avatar';
 import Card from '@/components/ui/Card';
 import ExpenseCard from '@/components/expenses/ExpenseCard';
 import AddExpenseModal from '@/components/expenses/AddExpenseModal';
+import AddPeopleCard from '@/components/groups/AddPeopleCard';
 import InviteCard from '@/components/groups/InviteCard';
 import BalanceList from '@/components/balances/BalanceList';
 import SettlementList from '@/components/balances/SettlementList';
@@ -256,6 +257,11 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
         {tab === 'members' && (
           <div className="space-y-3">
             <InviteCard inviteCode={group.invite_code} groupName={group.name} />
+            <AddPeopleCard
+              groupId={id}
+              existingNames={allPersons.map((p) => p.name)}
+              onAdded={refetchGroup}
+            />
 
             {/* Real members */}
             <Card padding="none">

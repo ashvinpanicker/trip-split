@@ -34,19 +34,19 @@ export default function InviteCard({ inviteCode, groupName }: InviteCardProps) {
   return (
     <Card className="bg-blue-50 border-blue-100">
       <p className="text-xs font-medium text-blue-700 mb-2">One link for the whole group — drop it in WhatsApp</p>
-      <div className="flex items-center gap-3">
-        <div className="flex-1 bg-white rounded-xl px-4 py-2.5 border border-blue-100">
+      <div className="flex items-center gap-2">
+        <div className="flex-1 min-w-0 bg-white rounded-xl px-3 py-2.5 border border-blue-100">
           <p className="text-sm font-medium text-gray-900 truncate">{link.replace(/^https?:\/\//, '')}</p>
         </div>
         <button
           onClick={copyCode}
-          className="p-2.5 bg-white rounded-xl border border-blue-100 text-blue-600 hover:bg-blue-50"
+          className="shrink-0 p-2.5 bg-white rounded-xl border border-blue-100 text-blue-600 hover:bg-blue-50"
         >
           {copied ? <Check size={18} /> : <Copy size={18} />}
         </button>
         <button
           onClick={share}
-          className="p-2.5 bg-blue-600 rounded-xl text-white hover:bg-blue-700"
+          className="shrink-0 p-2.5 bg-blue-600 rounded-xl text-white hover:bg-blue-700"
         >
           <Share2 size={18} />
         </button>
