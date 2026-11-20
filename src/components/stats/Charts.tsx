@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { arc as d3arc, pie as d3pie } from 'd3-shape';
 import { scaleBand, scaleLinear } from 'd3-scale';
@@ -26,6 +26,20 @@ const SURFACE = '#ffffff';
 const GAIN = '#2a78d6'; // diverging pole: fronted money for others
 const LOSS = '#e34948'; // diverging pole: others paid for them
 const MID = '#d6d5d0'; // neutral zero line
+
+/** Width of an element in CSS pixels, so charts draw at real size instead of scaling text. */
+function useWidth<T extends HTMLElement>() {
+  const ref = useRef<T>(null);
+  const [w, setW] = useState(320);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([e]) => setW(Math.round(e.contentRect.width)));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return [ref, w] as const;
+}
 
 /** Rect with only its top corners rounded, so the bar stays square on the baseline. */
 const topRounded = (x: number, y: number, w: number, h: number, r: number) => {
@@ -75,7 +89,7 @@ export function CategoryDonut({ stats }: { stats: TripStats }) {
         </div>
       </div>
 
-      <ul className="w-full space-y-1">
+      <ul className="w-full sm:max-w-sm space-y-1">
         {stats.byCategory.map((c) => (
           <li key={c.key}>
             <button
@@ -98,15 +112,18 @@ export function CategoryDonut({ stats }: { stats: TripStats }) {
 export function DailyStacked({ stats }: { stats: TripStats }) {
   const days = stats.byDayCategory;
   const [picked, setPicked] = useState<string | null>(null);
-  const W = 340, H = 170, m = { t: 8, r: 4, b: 22, l: 34 };
-  const x = scaleBand().domain(days.map((d) => d.date)).range([m.l, W - m.r]).paddingInner(0.25).paddingOuter(0.1);
+  const [box, W] = useWidth<HTMLDivElement>();
+  const H = 180, m = { t: 8, r: 4, b: 22, l: 34 };
+  // Bars stay a sensible width on wide screens: cap the plot to ~56px per day
+  const plotR = Math.min(W - m.r, m.l + days.length * 56);
+  const x = scaleBand().domain(days.map((d) => d.date)).range([m.l, plotR]).paddingInner(0.25).paddingOuter(0.1);
   const y = scaleLinear().domain([0, d3max(days, (d) => d.total) || 1]).nice(3).range([H - m.b, m.t]);
   const avg = stats.perDay;
-  const showEvery = Math.ceil(days.length / 7); // keep date labels from colliding
+  const showEvery = Math.max(1, Math.ceil((days.length * 44) / Math.max(plotR - m.l, 1))); // ~44px per date label
   const day = days.find((d) => d.date === picked) ?? days.reduce((a, b) => (b.total > a.total ? b : a));
 
   return (
-    <div>
+    <div ref={box}>
       {/* Readout: the picked day, or the biggest day by default */}
       <div className="min-h-[2.75rem] mb-1">
         <p className="text-sm text-gray-900">
@@ -118,7 +135,7 @@ export function DailyStacked({ stats }: { stats: TripStats }) {
           {day.parts.map((p) => `${categoryOf(p.key).emoji} ${formatCurrency(p.total)}`).join('  ')}
         </p>
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label="Spending per day by category">
+      <svg width={W} height={H} className="block" role="img" aria-label="Spending per day by category">
         {y.ticks(3).map((t) => (
           <g key={t}>
             <line x1={m.l} x2={W - m.r} y1={y(t)} y2={y(t)} stroke="#eceae4" />
@@ -170,7 +187,7 @@ export function FrontedBars({ stats, me }: { stats: TripStats; me: string }) {
   const x = scaleLinear().domain([-lim, lim]).range([0, 100]);
 
   return (
-    <div>
+    <div className="max-w-xl">
       <div className="flex justify-between text-[11px] text-gray-500 mb-2">
         <span>← others covered them</span>
         <span>covered others →</span>
