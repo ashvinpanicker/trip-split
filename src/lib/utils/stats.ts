@@ -21,7 +21,7 @@ export function tripStats(expenses: StatExpense[], persons: BalancePerson[]) {
   const byDay = new Map<string, number>();
   const paid = new Map<string, number>();
   const consumed = new Map<string, number>();
-  const catShare = new Map<string, Map<string, number>>(); // category → person → paise
+  const catPaid = new Map<string, Map<string, number>>(); // category → payer → paise
   const logged = new Map<string, number>();
 
   for (const e of expenses) {
@@ -30,15 +30,17 @@ export function tripStats(expenses: StatExpense[], persons: BalancePerson[]) {
     add(byCat, cat, amt);
     add(byDay, e.date, amt);
     const payer = payerIdOf(e);
-    if (payer) add(paid, payer, amt);
+    if (payer) {
+      add(paid, payer, amt);
+      if (!catPaid.has(cat)) catPaid.set(cat, new Map());
+      add(catPaid.get(cat)!, payer, amt);
+    }
     if (e.created_by) add(logged, e.created_by, 1);
     for (const p of e.participants) {
       const id = p.user_id ?? p.pending_member_id;
       if (!id) continue;
       const share = toPaise(p.share_amount);
       add(consumed, id, share);
-      if (!catShare.has(cat)) catShare.set(cat, new Map());
-      add(catShare.get(cat)!, id, share);
     }
   }
 
@@ -50,19 +52,22 @@ export function tripStats(expenses: StatExpense[], persons: BalancePerson[]) {
   const biggest = expenses.reduce<StatExpense | null>((b, e) => (!b || toPaise(e.amount) > toPaise(b.amount) ? e : b), null);
 
   const awards: Award[] = [];
+  // A clear winner only: no award when the top two are tied
   const top = (m: Map<string, number> | undefined) => {
     const r = m ? ranked(m) : [];
-    return r.length && r[0].total > 0 ? r[0] : null;
+    if (!r.length || r[0].total <= 0) return null;
+    return r.length > 1 && r[1].total === r[0].total ? null : r[0];
   };
   const push = (emoji: string, title: string, t: PersonTotal | null, detail: (t: PersonTotal) => string) => {
     if (t) awards.push({ emoji, title, who: t.name, whoId: t.id, detail: detail(t) });
   };
   push('🏦', 'The group bank', top(paid), () => 'paid the most upfront');
-  push('🍺', 'Chief Beer Officer', top(catShare.get('drinks')), () => 'biggest share of drinks');
-  push('🍛', 'Foodie-in-chief', top(catShare.get('food')), () => 'biggest share of food');
-  push('🏄', 'Thrill seeker', top(catShare.get('activities')), () => 'biggest share of activities');
-  push('🛍️', 'Shopaholic', top(catShare.get('shopping')), () => 'biggest share of shopping');
-  push('🛵', 'Road warrior', top(catShare.get('travel')), () => 'biggest share of travel');
+  // Category awards go to whoever actually paid (not who logged it, not equal shares, which always tie)
+  push('🍺', 'Chief Beer Officer', top(catPaid.get('drinks')), () => 'bought the most rounds');
+  push('🍛', 'Foodie-in-chief', top(catPaid.get('food')), () => 'picked up the most food bills');
+  push('🏄', 'Thrill seeker', top(catPaid.get('activities')), () => 'paid for the most fun');
+  push('🛍️', 'Shopaholic', top(catPaid.get('shopping')), () => 'paid for the most shopping');
+  push('🛵', 'Road warrior', top(catPaid.get('travel')), () => 'paid for the most rides and fuel');
   const acct = [...logged.entries()].sort((a, b) => b[1] - a[1])[0];
   if (acct && acct[1] > 1) awards.push({ emoji: '🧾', title: 'The accountant', who: name(acct[0]), whoId: acct[0], detail: `logged ${acct[1]} expenses` });
 

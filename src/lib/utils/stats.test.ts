@@ -4,10 +4,10 @@ import { calculateEqualSplits, toPaise } from './balance';
 
 const people = ['A', 'B', 'C', 'D'].map((n) => ({ id: n, name: n }));
 let n = 0;
-const exp = (payer: string, amount: number, among: string[], category: string, date = '2026-11-21', title = `E${n}`) => {
+const exp = (payer: string, amount: number, among: string[], category: string, date = '2026-11-21', title = `E${n}`, loggedBy = payer) => {
   const s = calculateEqualSplits(amount, among);
   return {
-    id: `e${n++}`, title, amount, date, category, paid_by: payer, paid_by_pending: null, created_by: payer, notes: null,
+    id: `e${n++}`, title, amount, date, category, paid_by: payer, paid_by_pending: null, created_by: loggedBy, notes: null,
     participants: among.map((id) => ({ user_id: id, pending_member_id: null, share_amount: s[id] })),
   };
 };
@@ -16,7 +16,7 @@ const rng = (seed: number) => () => ((seed = (seed * 1664525 + 1013904223) % 429
 describe('tripStats', () => {
   const trip = [
     exp('A', 4000, ['A', 'B', 'C', 'D'], 'stay', '2026-11-20', 'Villa'),
-    exp('B', 1200, ['B', 'C', 'D'], 'drinks', '2026-11-20', 'Beers'),
+    exp('B', 1200, ['B', 'C', 'D'], 'drinks', '2026-11-20', 'Beers', 'D'), // B paid, D logged it
     exp('C', 900, ['A', 'B', 'C'], 'food', '2026-11-21', 'Thali'),
     exp('A', 300, ['A', 'B'], 'food', '2026-11-21', 'Chai'),
   ];
@@ -37,10 +37,21 @@ describe('tripStats', () => {
   it('awards go to the right people', () => {
     const award = (t: string) => s.awards.find((a) => a.title === t)?.who;
     expect(award('The group bank')).toBe('A');
-    expect(award('Chief Beer Officer')).toBe('B'); // B, C, D tie at 400; first wins deterministically
-    expect(award('Foodie-in-chief')).toBe('A'); // A: 300 + 150 = 450 vs B 450? B: 300 + 150 = 450, C: 300
-    expect(award('The accountant')).toBe('A');
-    expect(award('Road warrior')).toBeUndefined();
+    expect(award('Chief Beer Officer')).toBe('B'); // B paid for the beers; D only logged them
+    expect(award('Foodie-in-chief')).toBe('C'); // C paid 900 for food vs A 300
+    expect(award('The accountant')).toBe('A'); // logged Villa and Chai
+    expect(award('Road warrior')).toBeUndefined(); // no travel
+  });
+
+  it('awards are about who paid, and ties give no award', () => {
+    const t = tripStats([
+      exp('A', 500, ['A', 'B', 'C', 'D'], 'travel', '2026-11-20', 'Scooters', 'C'),
+      exp('B', 500, ['A', 'B', 'C', 'D'], 'travel', '2026-11-20', 'Fuel', 'C'),
+      exp('D', 2000, ['A', 'B', 'C', 'D'], 'drinks', '2026-11-20', 'Round 1', 'A'),
+    ], people);
+    const award = (x: string) => t.awards.find((a) => a.title === x)?.who;
+    expect(award('Road warrior')).toBeUndefined(); // A and B both paid 500
+    expect(award('Chief Beer Officer')).toBe('D'); // paid, even though A logged it and everyone shared equally
   });
 
   it('every breakdown sums exactly to the total — 500 random trips', () => {

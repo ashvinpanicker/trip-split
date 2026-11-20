@@ -41,6 +41,9 @@ export function OfflineBanner() {
 
 type BIPEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> };
 const DISMISS_KEY = 'tripsplit:install-dismissed';
+const INSTALLED_KEY = 'tripsplit:installed';
+const remember = (k: string) => { try { localStorage.setItem(k, '1'); } catch {} };
+const recalled = (k: string) => { try { return localStorage.getItem(k) === '1'; } catch { return false; } };
 
 /** "Add TripSplit to your home screen" card. One tap on Android; Share → Add to Home Screen hint on iPhone. */
 export function InstallPrompt() {
@@ -51,19 +54,27 @@ export function InstallPrompt() {
   useEffect(() => {
     const standalone =
       window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone === true;
-    let dismissed = false;
-    try { dismissed = localStorage.getItem(DISMISS_KEY) === '1'; } catch {}
-    if (standalone || dismissed) return;
+    // Opened from the home screen: remember it, so the browser stops offering the install
+    if (standalone) { remember(INSTALLED_KEY); return; }
+    if (recalled(INSTALLED_KEY) || recalled(DISMISS_KEY)) return;
+    let cancelled = false;
+    // Chrome on Android can tell us directly whether this app is installed
+    (navigator as any).getInstalledRelatedApps?.()
+      .then((apps: unknown[]) => {
+        if (!cancelled && apps?.length) { remember(INSTALLED_KEY); setHidden(true); }
+      })
+      .catch(() => {});
 
     const ua = navigator.userAgent;
     const isIos = /iphone|ipad|ipod/i.test(ua) || (ua.includes('Mac') && navigator.maxTouchPoints > 1);
     if (isIos) { setIos(true); setHidden(false); }
 
     const onPrompt = (e: Event) => { e.preventDefault(); setEvent(e as BIPEvent); setHidden(false); };
-    const onInstalled = () => setHidden(true);
+    const onInstalled = () => { remember(INSTALLED_KEY); setHidden(true); };
     window.addEventListener('beforeinstallprompt', onPrompt);
     window.addEventListener('appinstalled', onInstalled);
     return () => {
+      cancelled = true;
       window.removeEventListener('beforeinstallprompt', onPrompt);
       window.removeEventListener('appinstalled', onInstalled);
     };
@@ -71,7 +82,7 @@ export function InstallPrompt() {
 
   function dismiss() {
     setHidden(true);
-    try { localStorage.setItem(DISMISS_KEY, '1'); } catch {}
+    remember(DISMISS_KEY);
   }
 
   async function install() {
@@ -79,7 +90,7 @@ export function InstallPrompt() {
     await event.prompt();
     const { outcome } = await event.userChoice;
     setEvent(null);
-    if (outcome === 'accepted') setHidden(true);
+    if (outcome === 'accepted') { remember(INSTALLED_KEY); setHidden(true); }
   }
 
   if (hidden || (!event && !ios)) return null;
