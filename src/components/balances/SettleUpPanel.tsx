@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ChevronDown, Sparkles, Share2 } from 'lucide-react';
+import { ChevronDown, Share2 } from 'lucide-react';
 import Card from '@/components/ui/Card';
 import BalanceList from './BalanceList';
 import SettlementList from './SettlementList';
@@ -10,8 +10,15 @@ import type { Balance, Settlement } from '@/types';
 
 interface SettleUpPanelProps {
   balances: Balance[];
-  smart: Settlement[];
-  direct: Settlement[];
+  /** Everyone pays back exactly who paid for them (netted per pair) */
+  byPerson: Settlement[];
+  /** Fewest payments, preferring real debts */
+  simplified: Settlement[];
+  /** Group setting, changed by admins only */
+  simplify: boolean;
+  isAdmin: boolean;
+  onToggleSimplify: (next: boolean) => void;
+  onOpenPerson: (personId: string) => void;
   currentUserId: string;
   groupId: string;
   groupName: string;
@@ -20,12 +27,13 @@ interface SettleUpPanelProps {
 }
 
 export default function SettleUpPanel({
-  balances, smart, direct, currentUserId, groupId, groupName, upiIds, onRecorded,
+  balances, byPerson, simplified, simplify, isAdmin, onToggleSimplify, onOpenPerson,
+  currentUserId, groupId, groupName, upiIds, onRecorded,
 }: SettleUpPanelProps) {
-  const [mode, setMode] = useState<'smart' | 'direct'>('smart');
   const [showAll, setShowAll] = useState(false);
 
-  const plan = mode === 'smart' ? smart : direct;
+  const plan = simplify ? simplified : byPerson;
+  const realPairs = useMemo(() => new Set(byPerson.map((s) => `${s.from_id}>${s.to_id}`)), [byPerson]);
   const mine = (s: Settlement) => s.from_id === currentUserId || s.to_id === currentUserId;
   // Your payments first, then biggest amounts
   const sorted = useMemo(
@@ -37,19 +45,19 @@ export default function SettleUpPanel({
   const me = balances.find((b) => b.person_id === currentUserId)?.net_balance ?? 0;
   const iOwe = plan.filter((s) => s.from_id === currentUserId);
   const owedToMe = plan.filter((s) => s.to_id === currentUserId);
-  const saved = direct.length - smart.length;
+  const saved = byPerson.length - simplified.length;
 
   function shareText() {
-    const lines = smart.map((s) => `• ${s.from_name} → ${s.to_name}: ${formatCurrency(s.amount)}`);
-    return `💸 ${groupName} — settle up (${smart.length} payment${smart.length === 1 ? '' : 's'})\n\n${lines.join('\n')}\n\nPay via the app: ${window.location.origin}/groups/${groupId}`;
+    const lines = plan.map((s) => `• ${s.from_name} → ${s.to_name}: ${formatCurrency(s.amount)}`);
+    return `💸 ${groupName}: settle up (${plan.length} payment${plan.length === 1 ? '' : 's'})\n\n${lines.join('\n')}\n\nDetails: ${window.location.origin}/groups/${groupId}`;
   }
 
   return (
     <Card padding="none" className="overflow-hidden">
       {/* Your status */}
-      <div className={`px-4 py-4 ${me > 0.005 ? 'bg-green-50' : me < -0.005 ? 'bg-red-50' : 'bg-gray-50'}`}>
+      <div className={`px-4 py-4 ${me > 0 ? 'bg-green-50' : me < 0 ? 'bg-red-50' : 'bg-gray-50'}`}>
         <p className="text-xs font-medium text-gray-500">Your status</p>
-        {Math.abs(me) < 0.005 ? (
+        {me === 0 ? (
           <p className="text-lg font-bold text-gray-900">You&apos;re all settled 🎉</p>
         ) : me > 0 ? (
           <p className="text-lg font-bold text-green-700">You get back {formatCurrency(me)}</p>
@@ -66,31 +74,38 @@ export default function SettleUpPanel({
       </div>
 
       <div className="p-4 space-y-3">
-        {/* Mode toggle */}
-        {plan.length + direct.length > 0 && (
-          <>
-            <div className="grid grid-cols-2 gap-1 p-1 bg-gray-100 rounded-xl">
-              {(['smart', 'direct'] as const).map((m) => (
+        {/* How payments are worked out */}
+        {(byPerson.length > 0 || simplified.length > 0) && (
+          <div className="rounded-xl bg-gray-50 px-3 py-2.5">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-gray-900">{simplify ? 'Simplified payments' : 'Pay back by person'}</p>
+                <p className="text-xs text-gray-500">
+                  {simplify
+                    ? `${simplified.length} payments instead of ${byPerson.length}. Some people pay someone other than who they owe.`
+                    : 'Everyone pays back exactly who paid for them.'}
+                </p>
+              </div>
+              {isAdmin && (
                 <button
-                  key={m}
-                  onClick={() => setMode(m)}
-                  className={`flex items-center justify-center gap-1.5 h-9 rounded-lg text-sm font-medium transition-colors ${
-                    mode === m ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
-                  }`}
+                  role="switch"
+                  aria-checked={simplify}
+                  aria-label="Simplify payments"
+                  onClick={() => onToggleSimplify(!simplify)}
+                  className={`relative shrink-0 w-11 h-6 rounded-full transition-colors ${simplify ? 'bg-blue-600' : 'bg-gray-300'}`}
                 >
-                  {m === 'smart' && <Sparkles size={14} className={mode === m ? 'text-blue-600' : ''} />}
-                  {m === 'smart' ? `Smart · ${smart.length}` : `Direct · ${direct.length}`}
+                  <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${simplify ? 'translate-x-5' : ''}`} />
                 </button>
-              ))}
+              )}
             </div>
-            <p className="text-xs text-gray-500">
-              {mode === 'smart'
-                ? saved > 0
-                  ? `Fewest payments possible — ${saved} fewer than paying everyone back directly.`
-                  : 'Fewest payments possible.'
-                : 'Everyone pays back exactly who paid for them.'}
-            </p>
-          </>
+            {!simplify && saved > 0 && (
+              <p className="text-xs text-blue-700 mt-1.5">
+                {isAdmin
+                  ? `Turn on Simplify to cut this to ${simplified.length} payments. Best for the final settle-up.`
+                  : `Your group admin can simplify this to ${simplified.length} payments for the final settle-up.`}
+              </p>
+            )}
+          </div>
         )}
 
         <SettlementList
@@ -100,9 +115,11 @@ export default function SettleUpPanel({
           groupName={groupName}
           upiIds={upiIds}
           onRecorded={onRecorded}
+          onOpenPerson={onOpenPerson}
+          isRerouted={simplify ? (s) => !realPairs.has(`${s.from_id}>${s.to_id}`) : undefined}
         />
 
-        {smart.length > 0 && (
+        {plan.length > 0 && (
           <a
             href={`https://wa.me/?text=${encodeURIComponent(typeof window !== 'undefined' ? shareText() : '')}`}
             target="_blank"
@@ -114,17 +131,19 @@ export default function SettleUpPanel({
         )}
       </div>
 
-      {/* Everyone's balance, collapsed by default */}
+      {/* Everyone's balance, collapsed by default; tap a person for the breakdown */}
       <button
         onClick={() => setShowAll((v) => !v)}
         className="w-full flex items-center justify-between px-4 py-3 border-t border-gray-100 text-sm font-medium text-gray-700"
+        aria-expanded={showAll}
       >
         Everyone&apos;s balance
         <ChevronDown size={16} className={`transition-transform ${showAll ? 'rotate-180' : ''}`} />
       </button>
       {showAll && (
         <div className="px-4 pb-4">
-          <BalanceList balances={balances} currentUserId={currentUserId} />
+          <p className="text-xs text-gray-500 mb-1">Tap someone to see what&apos;s between you.</p>
+          <BalanceList balances={balances} currentUserId={currentUserId} onSelect={onOpenPerson} />
         </div>
       )}
     </Card>

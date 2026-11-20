@@ -29,6 +29,7 @@ export interface Group {
   description: string | null;
   created_by: string | null;
   invite_code: string;
+  simplify_debts?: boolean;
   created_at: string;
   updated_at: string;
   member_count?: number;

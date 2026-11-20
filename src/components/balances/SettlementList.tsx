@@ -17,10 +17,14 @@ interface SettlementListProps {
   /** person id → UPI ID */
   upiIds?: Record<string, string | null | undefined>;
   onRecorded?: () => void;
+  /** Open "You & X" for the other person on rows that involve you */
+  onOpenPerson?: (personId: string) => void;
+  /** Rows that aren't a real "who owes whom" debt (only possible when payments are simplified) */
+  isRerouted?: (s: Settlement) => boolean;
 }
 
 export default function SettlementList({
-  settlements, currentUserId, groupId, groupName, upiIds = {}, onRecorded,
+  settlements, currentUserId, groupId, groupName, upiIds = {}, onRecorded, onOpenPerson, isRerouted,
 }: SettlementListProps) {
   const { toast } = useToast();
   const [savingIdx, setSavingIdx] = useState<number | null>(null);
@@ -87,6 +91,20 @@ export default function SettlementList({
                 <Avatar name={isYouReceiving ? 'You' : s.to_name} size="sm" />
               </div>
             </div>
+
+            {(isRerouted?.(s) || (onOpenPerson && (isYouPaying || isYouReceiving))) && (
+              <div className="flex items-center justify-between gap-2 mt-1.5 text-xs">
+                <span className="text-gray-500">{isRerouted?.(s) ? 'Simplified: covers debts between others' : ''}</span>
+                {onOpenPerson && (isYouPaying || isYouReceiving) && (
+                  <button
+                    onClick={() => onOpenPerson(isYouPaying ? s.to_id : s.from_id)}
+                    className="font-medium text-blue-600 shrink-0"
+                  >
+                    See breakdown
+                  </button>
+                )}
+              </div>
+            )}
 
             {groupId && !(isYouPaying || isYouReceiving) && (
               <div className="flex justify-end mt-1.5">

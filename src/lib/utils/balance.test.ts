@@ -9,6 +9,7 @@ import {
   directDebts,
   toPaise,
   myNetByGroup,
+  pairBreakdown,
   type BalancePerson,
 } from './balance';
 import type { Balance, Settlement } from '@/types';
@@ -372,5 +373,69 @@ describe('myNetByGroup', () => {
   it('recorded payments clear the dashboard too', () => {
     const e = [withGroup('g', exp('A', 1000, ['A', 'B']))];
     expect(myNetByGroup('A', e, [{ group_id: 'g', from_person: 'B', to_person: 'A', amount: 500 }])).toEqual({ g: 0 });
+  });
+});
+
+// ── simplified plans keep real debts where they can ───────────────────
+describe('smartSettle with real-debt preference', () => {
+  it('keeps "Rahul pays me for breakfast" instead of rerouting it', () => {
+    // Me paid breakfast for Rahul (1000). Andrews paid for Rahul (500) and Garg (1500).
+    const ps = people('Me', 'Andrews', 'Rahul', 'Garg');
+    const exps = [exp('Me', 1000, ['Rahul']), exp('Andrews', 500, ['Rahul']), exp('Andrews', 1500, ['Garg'])];
+    const b = calculateGroupBalances(exps, ps);
+    const direct = directDebts(exps, ps);
+    const plan = smartSettle(b, direct);
+    expect(plan.length).toBe(smartSettle(b).length); // still the minimum
+    const real = new Set(direct.map((d) => `${d.from_id}>${d.to_id}`));
+    expect(plan.every((p) => real.has(`${p.from_id}>${p.to_id}`))).toBe(true);
+    expect(plan).toContainEqual(expect.objectContaining({ from_id: 'Rahul', to_id: 'Me', amount: 1000 }));
+  });
+
+  it('never costs an extra payment and still clears everyone — 1,000 random trips vs brute force', () => {
+    const r = rng(9);
+    const ps = people(...[...Array(7)].map((_, i) => `p${i}`));
+    for (let t = 0; t < 1000; t++) {
+      const exps = [...Array(1 + Math.floor(r() * 10))].map(() =>
+        exp(ps[Math.floor(r() * 7)].id, Math.round(r() * 20) * 100 + 100, ps.filter(() => r() < 0.5).map((p) => p.id).concat('p3')));
+      const b = calculateGroupBalances(exps, ps);
+      const plan = smartSettle(b, directDebts(exps, ps));
+      expect(Object.values(leftover(b, plan)).every((v) => v === 0)).toBe(true);
+      expect(plan.length).toBe(bruteMinPayments(b.map((x) => toPaise(x.net_balance))));
+    }
+  });
+});
+
+// ── per-person breakdown ──────────────────────────────────────────────
+describe('pairBreakdown', () => {
+  const withMeta = (e: Exp, i: number) => ({ ...e, id: `e${i}`, title: `Expense ${i}`, date: `2026-11-${10 + i}` });
+
+  it('breakfast for two: Rahul owes me half', () => {
+    const exps = [withMeta(exp('Me', 2600, ['Me', 'Rahul']), 0)];
+    const { items, net } = pairBreakdown('Me', 'Rahul', exps);
+    expect(net).toBe(1300);
+    expect(items).toEqual([{ kind: 'expense', id: 'e0', title: 'Expense 0', date: '2026-11-10', amount: 1300 }]);
+  });
+
+  it('nets both directions and payments', () => {
+    const exps = [withMeta(exp('Me', 2600, ['Me', 'Rahul']), 0), withMeta(exp('Rahul', 600, ['Me', 'Rahul']), 1)];
+    expect(pairBreakdown('Me', 'Rahul', exps, [{ from_person: 'Rahul', to_person: 'Me', amount: 500 }]).net).toBe(500);
+    expect(pairBreakdown('Rahul', 'Me', exps).net).toBe(-1000);
+  });
+
+  it('always matches directDebts for every pair — 300 random trips', () => {
+    const r = rng(10);
+    const ps = people(...[...Array(6)].map((_, i) => `p${i}`));
+    for (let t = 0; t < 300; t++) {
+      const exps = [...Array(1 + Math.floor(r() * 15))].map((_, i) =>
+        withMeta(exp(ps[Math.floor(r() * 6)].id, Math.round(r() * 300_000) / 100 + 1, [...new Set(ps.filter(() => r() < 0.6).map((p) => p.id).concat('p2'))]), i));
+      const pays = [{ from_person: 'p1', to_person: 'p0', amount: 77.77 }];
+      const direct = directDebts(exps, ps, pays);
+      for (const a of ps) for (const b of ps) {
+        if (a.id === b.id) continue;
+        const d = direct.find((x) => x.from_id === b.id && x.to_id === a.id)?.amount ?? 0;
+        const rev = direct.find((x) => x.from_id === a.id && x.to_id === b.id)?.amount ?? 0;
+        expect(pairBreakdown(a.id, b.id, exps, pays).net).toBe(toPaise(d - rev) / 100);
+      }
+    }
   });
 });

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { REPO_URL } from '@/lib/marketing/site';
+import SupportLinks from '@/components/SupportLinks';
 
 export default function Footer() {
   return (
@@ -10,6 +11,7 @@ export default function Footer() {
           <p className="text-[var(--ink-soft)] mt-1 max-w-xs">
             Free, open-source expense splitting for trips, flats and everything in between.
           </p>
+          <SupportLinks className="mt-4 text-[var(--ink-soft)] text-sm" />
         </div>
         <div className="grid gap-2 content-start">
           <Link href="/splitwise-alternative" className="hover:text-[var(--blue)]">Free Splitwise alternative</Link>

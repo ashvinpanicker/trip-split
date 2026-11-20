@@ -2,7 +2,7 @@
 
 import { useState, use } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Plus, Users, BarChart2, Receipt, Copy, Check, Trash2 } from 'lucide-react';
+import { ArrowLeft, Plus, Users, BarChart2, Receipt, Copy, Check, Trash2, History } from 'lucide-react';
 import { format } from 'date-fns';
 import AppHeader from '@/components/layout/AppHeader';
 import Button from '@/components/ui/Button';
@@ -12,6 +12,8 @@ import Card from '@/components/ui/Card';
 import ExpenseCard from '@/components/expenses/ExpenseCard';
 import AddExpenseModal from '@/components/expenses/AddExpenseModal';
 import SettleUpPanel from '@/components/balances/SettleUpPanel';
+import PersonSheet from '@/components/balances/PersonSheet';
+import ActivityFeed from '@/components/activity/ActivityFeed';
 import AddPeopleCard from '@/components/groups/AddPeopleCard';
 import InviteCard from '@/components/groups/InviteCard';
 import { useGroup } from '@/hooks/useGroups';
@@ -22,7 +24,7 @@ import { useUser } from '@/hooks/useUser';
 import { calculateGroupBalances, smartSettle, directDebts, formatCurrency, categoryOf, type BalancePerson } from '@/lib/utils/balance';
 import type { Expense, ExpenseParticipant } from '@/types';
 
-type Tab = 'expenses' | 'balances' | 'members';
+type Tab = 'expenses' | 'balances' | 'members' | 'activity';
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -43,11 +45,14 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
   const router = useRouter();
   const { user } = useUser();
   const { group, loading: groupLoading, refetch: refetchGroup } = useGroup(id);
-  const { expenses, loading: expLoading, refetch: refetchExpenses } = useExpenses(id);
+  const { expenses, loading: expLoading } = useExpenses(id);
   const { settlements: payments, refetch: refetchPayments } = useSettlements(id);
   const { toast } = useToast();
   const [tab, setTab] = useState<Tab>('expenses');
   const [showAddExpense, setShowAddExpense] = useState(false);
+  const [personId, setPersonId] = useState<string | null>(null);
+  // One signal for "something changed": expenses, totals and the activity feed all reload on it
+  const changed = () => window.dispatchEvent(new Event('tripsplit:expenses-changed'));
 
   if (groupLoading) {
     return (
@@ -78,8 +83,24 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
 
   const expensesWithParts = expenses.filter((e) => e.participants) as (Expense & { participants: ExpenseParticipant[] })[];
   const balances = calculateGroupBalances(expensesWithParts, allPersons, payments);
-  const settlements = smartSettle(balances);
   const directPlan = directDebts(expensesWithParts, allPersons, payments);
+  const settlements = smartSettle(balances, directPlan);
+  const myRole = (group.members || []).find((m: any) => m.user_id === user.id)?.role;
+  const isAdmin = myRole === 'admin';
+  const simplify = !!group.simplify_debts;
+  const adminCount = (group.members || []).filter((m: any) => m.role === 'admin').length;
+
+  async function toggleSimplify(next: boolean) {
+    const { error } = await createClient().from('groups').update({ simplify_debts: next }).eq('id', id);
+    if (error) toast(error.message, 'error');
+    else { toast(next ? 'Payments simplified for everyone' : 'Back to paying by person'); refetchGroup(); }
+  }
+
+  async function setRole(userId: string, role: 'admin' | 'member') {
+    const { error } = await createClient().rpc('set_member_role', { p_group_id: id, p_user_id: userId, p_role: role });
+    if (error) toast(error.message, 'error');
+    else { toast(role === 'admin' ? 'Made admin' : 'Removed as admin'); refetchGroup(); }
+  }
   const totalExpenses = expenses.reduce((s, e) => s + Number(e.amount), 0);
   const myBalance = balances.find((b) => b.person_id === user.id);
   const myTotalShare = expensesWithParts.reduce(
@@ -99,7 +120,7 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
     if (!confirm('Delete this payment record?')) return;
     const { error } = await createClient().from('settlements').delete().eq('id', paymentId);
     if (error) toast(error.message, 'error');
-    else { toast('Payment deleted'); refetchPayments(); }
+    else { toast('Payment deleted'); refetchPayments(); changed(); }
   }
 
   return (
@@ -146,16 +167,17 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
             { key: 'expenses', label: 'Expenses', icon: Receipt },
             { key: 'balances', label: 'Balances', icon: BarChart2 },
             { key: 'members', label: 'Members', icon: Users },
+            { key: 'activity', label: 'Activity', icon: History },
           ] as const).map(({ key, label, icon: Icon }) => (
             <button
               key={key}
               onClick={() => setTab(key)}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-sm font-medium border-b-2 transition-colors ${
+              className={`flex-1 min-w-0 flex items-center justify-center gap-1 py-3 text-[13px] sm:text-sm font-medium border-b-2 transition-colors ${
                 tab === key ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500'
               }`}
             >
-              <Icon size={15} />
-              {label}
+              <Icon size={14} className="shrink-0" />
+              <span className="truncate">{label}</span>
             </button>
           ))}
         </div>
@@ -179,8 +201,8 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
                 key={expense.id}
                 expense={expense}
                 currentUserId={user.id}
-                onDelete={refetchExpenses}
-                onUpdate={refetchExpenses}
+                onDelete={changed}
+                onUpdate={changed}
               />
             ))
           )
@@ -191,13 +213,17 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
           <div className="space-y-4">
             <SettleUpPanel
               balances={balances}
-              smart={settlements}
-              direct={directPlan}
+              simplified={settlements}
+              byPerson={directPlan}
+              simplify={simplify}
+              isAdmin={isAdmin}
+              onToggleSimplify={toggleSimplify}
+              onOpenPerson={setPersonId}
               currentUserId={user.id}
               groupId={id}
               groupName={group.name}
               upiIds={upiIds}
-              onRecorded={refetchPayments}
+              onRecorded={() => { refetchPayments(); changed(); }}
             />
 
             {payments.length > 0 && (
@@ -248,10 +274,20 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
           </div>
         )}
 
+        {/* Activity tab */}
+        {tab === 'activity' && (
+          <ActivityFeed groupId={id} currentUserId={user.id} nameOf={(pid) => nameOf(pid)} />
+        )}
+
         {/* Members tab */}
         {tab === 'members' && (
           <div className="space-y-3">
             <InviteCard inviteCode={group.invite_code} groupName={group.name} />
+            {isAdmin && (
+              <p className="text-xs text-gray-500 px-1">
+                You&apos;re an admin: you can make others admin below, and turn on simplified payments in Balances.
+              </p>
+            )}
             <AddPeopleCard
               groupId={id}
               existingNames={allPersons.map((p) => p.name)}
@@ -270,9 +306,19 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
                       <p className="font-medium text-gray-900 truncate">{name}</p>
                       <p className="text-xs text-gray-500 truncate">{p?.email}</p>
                     </div>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${m.role === 'admin' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
-                      {m.role}
-                    </span>
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${m.role === 'admin' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
+                        {m.role}
+                      </span>
+                      {isAdmin && m.user_id !== user.id && (m.role === 'member' || adminCount > 1) && (
+                        <button
+                          onClick={() => setRole(m.user_id, m.role === 'admin' ? 'member' : 'admin')}
+                          className="text-xs font-medium text-blue-600"
+                        >
+                          {m.role === 'admin' ? 'Remove admin' : 'Make admin'}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -311,11 +357,20 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
         )}
       </div>
 
+      <PersonSheet
+        open={!!personId}
+        onClose={() => setPersonId(null)}
+        me={user.id}
+        other={personId ? allPersons.find((p) => p.id === personId) ?? null : null}
+        expenses={expensesWithParts}
+        payments={payments}
+      />
+
       <AddExpenseModal
         open={showAddExpense}
         onClose={() => setShowAddExpense(false)}
         groupId={id}
-        onSuccess={refetchExpenses}
+        onSuccess={changed}
       />
     </div>
   );

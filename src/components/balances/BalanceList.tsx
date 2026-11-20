@@ -5,9 +5,11 @@ import type { Balance } from '@/types';
 interface BalanceListProps {
   balances: Balance[];
   currentUserId: string;
+  /** Tap a person to see what's between you and them */
+  onSelect?: (personId: string) => void;
 }
 
-export default function BalanceList({ balances, currentUserId }: BalanceListProps) {
+export default function BalanceList({ balances, currentUserId, onSelect }: BalanceListProps) {
   if (balances.length === 0) {
     return <p className="text-gray-500 text-sm text-center py-4">No balances yet</p>;
   }
@@ -19,8 +21,13 @@ export default function BalanceList({ balances, currentUserId }: BalanceListProp
         const isOwed = b.net_balance > 0;
         const settled = b.net_balance === 0;
 
+        const tappable = !!onSelect && !isYou;
         return (
-          <div key={b.person_id} className="flex items-center gap-3 py-2">
+          <div
+            key={b.person_id}
+            className={`flex items-center gap-3 py-2 ${tappable ? 'cursor-pointer active:bg-gray-50 -mx-2 px-2 rounded-lg' : ''}`}
+            {...(tappable ? { role: 'button', tabIndex: 0, onClick: () => onSelect!(b.person_id), onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter') onSelect!(b.person_id); } } : {})}
+          >
             <Avatar src={b.avatar_url} name={b.user_name} size="sm" />
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5">

@@ -83,18 +83,76 @@ export function myNetByGroup(
   return Object.fromEntries(Object.entries(net).map(([g, v]) => [g, toRupees(v)]));
 }
 
-/** Settle a set of balances that sum to zero with greedy largest-debtor → largest-creditor matching. */
-function greedySettle(people: { id: string; name: string; cents: number }[]): Settlement[] {
-  const cred = people.filter((p) => p.cents > 0).map((p) => ({ ...p })).sort((a, b) => b.cents - a.cents);
-  const debt = people.filter((p) => p.cents < 0).map((p) => ({ ...p, cents: -p.cents })).sort((a, b) => b.cents - a.cents);
+export type PairItem = { kind: 'expense' | 'payment'; id: string; title: string; date: string; amount: number };
+
+/**
+ * Everything between two people, from `me`'s side: positive = they owe me for it.
+ * The items sum exactly to what directDebts says one owes the other.
+ */
+export function pairBreakdown(
+  me: string,
+  other: string,
+  expenses: (Pick<Expense, 'id' | 'title' | 'date' | 'paid_by' | 'paid_by_pending'> & { participants: Pick<ExpenseParticipant, 'user_id' | 'pending_member_id' | 'share_amount'>[] })[],
+  payments: (Pick<SettlementRecord, 'from_person' | 'to_person' | 'amount'> & { id?: string; date?: string })[] = []
+): { items: PairItem[]; net: number } {
+  const items: PairItem[] = [];
+  for (const e of expenses) {
+    const payer = payerIdOf(e);
+    if (payer !== me && payer !== other) continue;
+    const debtor = payer === me ? other : me;
+    const share = e.participants.find((p) => (p.user_id ?? p.pending_member_id) === debtor);
+    if (!share) continue;
+    const paise = toPaise(share.share_amount);
+    if (!paise) continue;
+    items.push({ kind: 'expense', id: e.id, title: e.title, date: e.date, amount: toRupees(payer === me ? paise : -paise) });
+  }
+  payments.forEach((p, i) => {
+    // They paid me → they owe me less; I paid them → they owe me more
+    if (p.from_person === other && p.to_person === me) items.push({ kind: 'payment', id: p.id ?? `p${i}`, title: 'Payment', date: p.date ?? '', amount: -toRupees(toPaise(p.amount)) });
+    if (p.from_person === me && p.to_person === other) items.push({ kind: 'payment', id: p.id ?? `p${i}`, title: 'Payment', date: p.date ?? '', amount: toRupees(toPaise(p.amount)) });
+  });
+  items.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  const net = toRupees(items.reduce((s, x) => s + toPaise(x.amount), 0));
+  return { items, net };
+}
+
+type Owes = (fromId: string, toId: string) => number; // paise `from` directly owes `to` (0 if none)
+
+/** Lexicographic "a is better than b". */
+const beats = (a: number[], b: number[]) => {
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] > b[i];
+  return false;
+};
+
+/**
+ * Settle a set of balances that sum to zero. Every step zeroes at least one person, so a group
+ * of k people never needs more than k − 1 payments. Among the valid choices at each step we
+ * prefer a debtor → creditor pair that genuinely owes each other (so "Rahul pays me for
+ * breakfast" survives simplification), then an exact match, then the biggest amount.
+ */
+function settleGroup(people: { id: string; name: string; cents: number }[], owes: Owes = () => 0): Settlement[] {
+  const cred = people.filter((p) => p.cents > 0).map((p) => ({ ...p }));
+  const debt = people.filter((p) => p.cents < 0).map((p) => ({ ...p, cents: -p.cents }));
   const out: Settlement[] = [];
-  let i = 0, j = 0;
-  while (i < cred.length && j < debt.length) {
-    const amt = Math.min(cred[i].cents, debt[j].cents);
-    if (amt > 0) out.push({ from_id: debt[j].id, from_name: debt[j].name, to_id: cred[i].id, to_name: cred[i].name, amount: amt / 100 });
-    cred[i].cents -= amt; debt[j].cents -= amt;
-    if (cred[i].cents === 0) i++;
-    if (debt[j].cents === 0) j++;
+  for (;;) {
+    let best: { d: (typeof debt)[0]; c: (typeof cred)[0]; score: number[] } | null = null;
+    for (const d of debt) {
+      if (!d.cents) continue;
+      for (const c of cred) {
+        if (!c.cents) continue;
+        const amt = Math.min(d.cents, c.cents);
+        const direct = Math.min(owes(d.id, c.id), amt);
+        const score = [direct > 0 ? 1 : 0, d.cents === c.cents ? 1 : 0, direct, amt];
+        if (!best || beats(score, best.score)) {
+          best = { d, c, score };
+        }
+      }
+    }
+    if (!best) break;
+    const amt = Math.min(best.d.cents, best.c.cents);
+    out.push({ from_id: best.d.id, from_name: best.d.name, to_id: best.c.id, to_name: best.c.name, amount: amt / 100 });
+    best.d.cents -= amt;
+    best.c.cents -= amt;
   }
   return out;
 }
@@ -105,7 +163,10 @@ function greedySettle(people: { id: string; name: string; cents: number }[]): Se
  * cancel out among themselves). We find that partition exactly for up to 14 people with
  * non-zero balances, then settle each group greedily. Larger groups fall back to greedy.
  */
-export function smartSettle(balances: Balance[]): Settlement[] {
+export function smartSettle(balances: Balance[], direct: Settlement[] = []): Settlement[] {
+  // Who genuinely owes whom (from directDebts), used only to choose between equally short plans
+  const owedMap = new Map(direct.map((s) => [`${s.from_id}|${s.to_id}`, toPaise(s.amount)]));
+  const owes: Owes = (a, b) => owedMap.get(`${a}|${b}`) ?? 0;
   const people = balances
     .map((b) => ({ id: b.person_id, name: b.user_name, cents: Math.round(b.net_balance * 100) }))
     .filter((p) => p.cents !== 0);
@@ -117,7 +178,7 @@ export function smartSettle(balances: Balance[]): Settlement[] {
   }
   const live = people.filter((p) => p.cents !== 0);
   const n = live.length;
-  if (n <= 2 || n > 14) return greedySettle(live);
+  if (n <= 2 || n > 14) return settleGroup(live, owes);
 
   const full = (1 << n) - 1;
   const sum = new Int32Array(1 << n);
@@ -152,7 +213,7 @@ export function smartSettle(balances: Balance[]): Settlement[] {
   const out: Settlement[] = [];
   for (let m = full; m; ) {
     const part = pick[m];
-    out.push(...greedySettle(live.filter((_, i) => part & (1 << i))));
+    out.push(...settleGroup(live.filter((_, i) => part & (1 << i)), owes));
     m ^= part;
   }
   return out;

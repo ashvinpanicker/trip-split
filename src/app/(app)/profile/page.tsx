@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { LogOut, User, Mail, Edit2, Check, IndianRupee } from 'lucide-react';
+import SupportLinks from '@/components/SupportLinks';
 import { createClient } from '@/lib/supabase/client';
 import AppHeader from '@/components/layout/AppHeader';
 import Avatar from '@/components/ui/Avatar';
@@ -142,6 +143,11 @@ export default function ProfilePage() {
         <Button variant="danger" fullWidth onClick={handleSignOut}>
           <LogOut size={16} className="mr-2" /> Sign out
         </Button>
+
+        <div className="text-center text-xs text-gray-500 pt-2">
+          <p>TripSplit is free and open source. <a href="https://github.com/ashvinpanicker/trip-split" className="underline">Source code</a></p>
+          <SupportLinks className="mt-1 [&_div]:justify-center" />
+        </div>
       </div>
     </div>
   );
