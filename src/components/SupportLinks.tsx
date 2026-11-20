@@ -15,14 +15,24 @@ export default function SupportLinks({ className = '' }: { className?: string })
   const [copied, setCopied] = useState('');
 
   async function copy(label: string, value: string) {
+    let ok = false;
     try {
       await navigator.clipboard.writeText(value);
+      ok = true;
     } catch {
-      prompt(`Copy ${label}:`, value);
-      return;
+      // Older browsers / in-app webviews: fall back to a hidden textarea
+      const ta = document.createElement('textarea');
+      ta.value = value;
+      ta.setAttribute('readonly', '');
+      ta.style.cssText = 'position:fixed;opacity:0';
+      document.body.appendChild(ta);
+      ta.select();
+      try { ok = document.execCommand('copy'); } catch {}
+      ta.remove();
     }
-    setCopied(label);
-    setTimeout(() => setCopied(''), 1800);
+    // If copying is blocked entirely, show the address so it can be copied by hand
+    setCopied(ok ? `Copied ${label}` : `${label}: ${value}`);
+    setTimeout(() => setCopied(''), ok ? 1800 : 15000);
   }
 
   return (
@@ -45,7 +55,7 @@ export default function SupportLinks({ className = '' }: { className?: string })
             {t.sub && <span className="absolute -bottom-0.5 -right-0.5 text-[8px] font-bold">{t.sub}</span>}
           </button>
         ))}
-        {copied && <span role="status" className="text-xs opacity-80">Copied {copied}</span>}
+        {copied && <span role="status" className="text-xs opacity-80 break-all select-all">{copied}</span>}
       </p>
     </div>
   );
