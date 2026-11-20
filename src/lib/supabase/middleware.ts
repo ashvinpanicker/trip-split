@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
-const MARKETING_PATHS = ['/', '/splitwise-alternative', '/how-to-split-trip-expenses', '/sitemap.xml', '/robots.txt', '/llms.txt', '/sw.js', '/offline.html'];
+const MARKETING_PATHS = ['/', '/splitwise-alternative', '/how-to-split-trip-expenses', '/sitemap.xml', '/robots.txt', '/llms.txt', '/sw.js', '/offline.html', '/privacy', '/terms'];
 // Everything under these is public content (guides, blog)
 const MARKETING_PREFIXES = ['/guides', '/blog'];
 const isMarketing = (p: string) =>

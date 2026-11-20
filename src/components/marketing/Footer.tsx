@@ -18,6 +18,8 @@ export default function Footer() {
           <Link href="/guides" className="hover:text-[var(--blue)]">Guides</Link>
           <Link href="/guides/split-holiday-trip-expenses" className="hover:text-[var(--blue)]">Holiday trip guide</Link>
           <Link href="/blog" className="hover:text-[var(--blue)]">Blog</Link>
+          <Link href="/privacy" className="hover:text-[var(--blue)]">Privacy</Link>
+          <Link href="/terms" className="hover:text-[var(--blue)]">Terms</Link>
           <Link href="/#faq" className="hover:text-[var(--blue)]">FAQ</Link>
         </div>
         <div className="grid gap-2 content-start">

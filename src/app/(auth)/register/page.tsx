@@ -1,6 +1,7 @@
 'use client';
 
 import { LogoMark } from '@/components/Logo';
+import GoogleSignIn from '@/components/auth/GoogleSignIn';
 
 import { useState } from 'react';
 import Link from 'next/link';
@@ -81,6 +82,11 @@ export default function RegisterPage() {
             </div>
           )}
 
+          <GoogleSignIn next="/dashboard" onError={setError} />
+          <div className="relative my-5">
+            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200" /></div>
+            <div className="relative flex justify-center text-xs"><span className="bg-white px-3 text-gray-400">or sign up with email</span></div>
+          </div>
           <form onSubmit={handleRegister} className="flex flex-col gap-4">
             <Input
               label="Full name"

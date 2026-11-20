@@ -21,4 +21,7 @@ export const SUPPORT = {
   usdtTrc20: process.env.NEXT_PUBLIC_TIP_USDT_TRC20 || 'TGCvUK8LawmTBmQxkrNBiJ5k7mor4h6jha',
   usdtErc20: process.env.NEXT_PUBLIC_TIP_USDT_ERC20 || '0xc0026E08B2aD3e919CB5Fb968056cf9D168EE901',
 };
+/** Public contact address (forwarded by Cloudflare Email Routing) */
+export const CONTACT_EMAIL = process.env.NEXT_PUBLIC_CONTACT_EMAIL || 'hello@gotripsplit.app';
+
 export const hasSupport = Boolean(SUPPORT.upi || SUPPORT.coffee || SUPPORT.lightning || SUPPORT.btc || SUPPORT.usdtTrc20 || SUPPORT.usdtErc20);
