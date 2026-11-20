@@ -3,52 +3,50 @@
 import { useState } from 'react';
 import { AUTHOR, SUPPORT, hasSupport } from '@/lib/marketing/site';
 
-const pill = 'inline-flex items-center gap-1.5 h-9 px-3 rounded-full border border-current/20 font-medium';
+const TIPS = [
+  { icon: '₹', label: 'UPI ID', value: SUPPORT.upi },
+  { icon: '₿', label: 'BTC address', value: SUPPORT.btc },
+  { icon: '₮', sub: 'T', label: 'USDT (TRC-20) address', value: SUPPORT.usdtTrc20 },
+  { icon: '₮', sub: 'E', label: 'USDT (ERC-20) address', value: SUPPORT.usdtErc20 },
+].filter((t) => t.value);
 
-function CopyButton({ label, value }: { label: string; value: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <button
-      type="button"
-      className={pill}
-      title={value}
-      onClick={async () => {
-        try {
-          await navigator.clipboard.writeText(value);
-          setCopied(true);
-          setTimeout(() => setCopied(false), 1500);
-        } catch {
-          prompt('Copy this:', value);
-        }
-      }}
-    >
-      {copied ? '✓ Copied' : label}
-    </button>
-  );
-}
-
-/** "Built by" signature plus tip links. Renders only the ones that are configured. */
+/** "Built by" signature plus tiny tip icons that copy an address. */
 export default function SupportLinks({ className = '' }: { className?: string }) {
-  const upi = SUPPORT.upi
-    ? `upi://pay?${new URLSearchParams({ pa: SUPPORT.upi, pn: AUTHOR.name, cu: 'INR', tn: 'TripSplit tip' })}`
-    : '';
+  const [copied, setCopied] = useState('');
+
+  async function copy(label: string, value: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+    } catch {
+      prompt(`Copy ${label}:`, value);
+      return;
+    }
+    setCopied(label);
+    setTimeout(() => setCopied(''), 1800);
+  }
+
   return (
     <div className={className}>
-      <p>
-        Built by <a href={AUTHOR.url} className="underline underline-offset-4" rel="noopener">{AUTHOR.name}</a>.
-        {hasSupport && ' Tips help pay for the domain and hosting.'}
+      <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+        <span>
+          Built by <a href={AUTHOR.url} className="underline underline-offset-4" rel="noopener">{AUTHOR.name}</a>
+          {hasSupport && ' · Tip'}
+        </span>
+        {TIPS.map((t) => (
+          <button
+            key={t.label}
+            type="button"
+            onClick={() => copy(t.label, t.value)}
+            title={`Copy ${t.label}`}
+            aria-label={`Copy ${t.label}`}
+            className="relative inline-flex h-6 w-6 items-center justify-center rounded-full border border-current/25 text-xs font-semibold leading-none opacity-80 hover:opacity-100"
+          >
+            {t.icon}
+            {t.sub && <span className="absolute -bottom-0.5 -right-0.5 text-[8px] font-bold">{t.sub}</span>}
+          </button>
+        ))}
+        {copied && <span role="status" className="text-xs opacity-80">Copied {copied}</span>}
       </p>
-      {hasSupport && (
-        <div className="mt-2 flex flex-wrap gap-2">
-          {upi && <a href={upi} className={pill}>☕ Tip via UPI</a>}
-          {SUPPORT.upi && <CopyButton label={`Copy UPI ID`} value={SUPPORT.upi} />}
-          {SUPPORT.coffee && <a href={SUPPORT.coffee} rel="noopener" className={pill}>☕ Buy me a coffee</a>}
-          {SUPPORT.lightning && <a href={`lightning:${SUPPORT.lightning}`} className={pill} title={SUPPORT.lightning}>⚡ Tip in sats</a>}
-          {SUPPORT.btc && <CopyButton label="₿ Copy BTC address" value={SUPPORT.btc} />}
-          {SUPPORT.usdtTrc20 && <CopyButton label="💵 Copy USDT (TRC-20)" value={SUPPORT.usdtTrc20} />}
-          {SUPPORT.usdtErc20 && <CopyButton label="💵 Copy USDT (ERC-20)" value={SUPPORT.usdtErc20} />}
-        </div>
-      )}
     </div>
   );
 }
