@@ -1,9 +1,11 @@
 'use client';
 
+import { LogoMark } from '@/components/Logo';
+
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Mail, Lock, SplitSquareHorizontal } from 'lucide-react';
+import { Mail, Lock } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
@@ -56,9 +58,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mb-3 shadow-lg shadow-blue-200">
-            <SplitSquareHorizontal size={32} className="text-white" />
-          </div>
+          <LogoMark size={64} className="mb-3 shadow-lg shadow-blue-200 rounded-2xl" />
           <h1 className="text-2xl font-bold text-gray-900">TripSplit</h1>
           <p className="text-gray-500 text-sm mt-1">Split expenses, not friendships</p>
         </div>

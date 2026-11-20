@@ -1,10 +1,11 @@
 import Link from 'next/link';
+import { LogoMark } from '@/components/Logo';
 
 export default function Nav() {
   return (
     <header className="wrap flex items-center justify-between h-16">
       <Link href="/" className="flex items-center gap-2 font-bold text-lg tracking-tight" aria-label="TripSplit home">
-        <span aria-hidden className="grid place-items-center w-8 h-8 rounded-[10px] bg-[var(--blue)] text-white text-base">₹</span>
+        <LogoMark size={32} />
         TripSplit
       </Link>
       <nav aria-label="Main" className="flex items-center gap-1 sm:gap-2 text-[0.95rem]">

@@ -12,7 +12,8 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     siteName: 'TripSplit',
-    locale: 'en_IN',
+    locale: 'en_US',
+    alternateLocale: ['en_IN', 'en_GB'],
     images: [{ url: '/og.png', width: 1200, height: 630, alt: 'TripSplit: split the trip, not the friendship' }],
   },
   twitter: { card: 'summary_large_image', images: ['/og.png'] },
@@ -21,7 +22,6 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
   viewportFit: 'cover',
   themeColor: '#1a56db',
 };
