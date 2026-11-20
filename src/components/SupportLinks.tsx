@@ -40,7 +40,7 @@ export default function SupportLinks({ className = '' }: { className?: string })
       <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
         <span>
           Built by <a href={AUTHOR.url} className="underline underline-offset-4" rel="noopener">{AUTHOR.name}</a>
-          {hasSupport && ' · Tip'}
+          {hasSupport && ' · Buy me a coffee ☕'}
         </span>
         {TIPS.map((t) => (
           <button
