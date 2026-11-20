@@ -439,3 +439,44 @@ describe('pairBreakdown', () => {
     }
   });
 });
+
+// ── itemized bills ────────────────────────────────────────────────────
+import { itemizedShares } from './balance';
+describe('itemizedShares', () => {
+  it('Goa dinner: items to the people who had them, service charge in proportion', () => {
+    const { shares, subtotal, total } = itemizedShares([
+      { name: 'Fish thali', price: 450, people: ['A'] },
+      { name: 'Prawn curry', price: 600, people: ['B', 'C'] },
+      { name: 'Beers', price: 900, people: ['A', 'B', 'C'] },
+    ], 195); // 10% service
+    expect(subtotal).toBe(1950);
+    expect(total).toBe(2145);
+    // A: 450 + 300 = 750 → +75; B: 300 + 300 = 600 → +60; C: 600 → +60
+    expect(shares).toEqual({ A: 825, B: 660, C: 660 });
+  });
+
+  it('a discount (negative extra) also sums exactly', () => {
+    const { shares, total } = itemizedShares([{ name: 'x', price: 100, people: ['A', 'B', 'C'] }], -10);
+    expect(total).toBe(90);
+    expect(Object.values(shares).reduce((s, v) => s + toPaise(v), 0)).toBe(9000);
+  });
+
+  it('always sums to the total, never negative for positive extras — 3,000 random bills', () => {
+    const r = rng(12);
+    const ks = ['A', 'B', 'C', 'D', 'E'];
+    for (let t = 0; t < 3000; t++) {
+      const items = [...Array(1 + Math.floor(r() * 8))].map(() => ({
+        name: 'i', price: Math.round(r() * 200000) / 100, people: ks.filter(() => r() < 0.5),
+      }));
+      const extra = Math.round(r() * 50000) / 100;
+      const { shares, total } = itemizedShares(items, extra);
+      const sum = Object.values(shares).reduce((s, v) => s + toPaise(v), 0);
+      if (Object.keys(shares).length) expect(sum).toBe(toPaise(total));
+      Object.values(shares).forEach((v) => expect(v).toBeGreaterThanOrEqual(0));
+      // shares pass the same validation as a hand-entered exact split
+      if (toPaise(total) > 0 && Object.keys(shares).length) {
+        expect(validateSplit('fixed', total, Object.entries(shares).map(([key, amount]) => ({ key, amount })))).toBeNull();
+      }
+    }
+  });
+});

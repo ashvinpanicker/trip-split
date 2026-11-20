@@ -17,7 +17,8 @@ const icon: Record<string, string> = {
   expense_added: '➕', expense_edited: '✏️', expense_deleted: '🗑️',
   payment_recorded: '💸', payment_deleted: '↩️',
   person_added: '👤', name_claimed: '🙋', member_joined: '🙋',
-  role_changed: '⭐', setting_changed: '⚙️',
+  role_changed: '⭐', setting_changed: '⚙️', currency_changed: '💱',
+  receipt_added: '📎', receipt_removed: '📎',
 };
 
 function describe(a: Activity): string {
@@ -37,6 +38,9 @@ function describe(a: Activity): string {
     case 'member_joined': return `joined the group`;
     case 'role_changed': return d.role === 'admin' ? `made ${d.name} an admin` : `removed ${d.name} as admin`;
     case 'setting_changed': return d.simplify_debts ? 'turned on simplified payments' : 'turned off simplified payments';
+    case 'currency_changed': return `changed the currency to ${d.currency}`;
+    case 'receipt_added': return `attached a receipt to “${d.title}”`;
+    case 'receipt_removed': return `removed the receipt from “${d.title}”`;
     default: return a.action.replace(/_/g, ' ');
   }
 }

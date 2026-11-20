@@ -2,7 +2,7 @@
 
 import { useState, use } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Plus, Users, BarChart2, Receipt, Copy, Check, Trash2, History } from 'lucide-react';
+import { ArrowLeft, Plus, Users, BarChart2, Receipt, Copy, Check, Trash2, History, Scale, Search, Download } from 'lucide-react';
 import { format } from 'date-fns';
 import AppHeader from '@/components/layout/AppHeader';
 import Button from '@/components/ui/Button';
@@ -14,6 +14,10 @@ import AddExpenseModal from '@/components/expenses/AddExpenseModal';
 import SettleUpPanel from '@/components/balances/SettleUpPanel';
 import PersonSheet from '@/components/balances/PersonSheet';
 import ActivityFeed from '@/components/activity/ActivityFeed';
+import TripStatsPanel from '@/components/stats/TripStatsPanel';
+import CurrencySelect from '@/components/groups/CurrencySelect';
+import { tripStats, filterExpenses } from '@/lib/utils/stats';
+import { expensesCsv } from '@/lib/utils/export';
 import AddPeopleCard from '@/components/groups/AddPeopleCard';
 import InviteCard from '@/components/groups/InviteCard';
 import { useGroup } from '@/hooks/useGroups';
@@ -21,10 +25,10 @@ import { useExpenses, useSettlements } from '@/hooks/useExpenses';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/components/ui/Toast';
 import { useUser } from '@/hooks/useUser';
-import { calculateGroupBalances, smartSettle, directDebts, formatCurrency, categoryOf, type BalancePerson } from '@/lib/utils/balance';
+import { setActiveCurrency, calculateGroupBalances, smartSettle, directDebts, formatCurrency, categoryOf, type BalancePerson } from '@/lib/utils/balance';
 import type { Expense, ExpenseParticipant } from '@/types';
 
-type Tab = 'expenses' | 'balances' | 'members' | 'activity';
+type Tab = 'expenses' | 'balances' | 'stats' | 'members' | 'activity';
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -51,6 +55,9 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
   const [tab, setTab] = useState<Tab>('expenses');
   const [showAddExpense, setShowAddExpense] = useState(false);
   const [personId, setPersonId] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const [catFilter, setCatFilter] = useState<string | null>(null);
+  const [payerFilter, setPayerFilter] = useState<string | null>(null);
   // One signal for "something changed": expenses, totals and the activity feed all reload on it
   const changed = () => window.dispatchEvent(new Event('tripsplit:expenses-changed'));
 
@@ -64,6 +71,8 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
   }
 
   if (!group || !user) return null;
+  // Everything below formats money in this trip's currency (symbol only, no conversion)
+  setActiveCurrency(group.currency);
 
   const realMembers: BalancePerson[] = (group.members || []).map((m: any) => {
     const p = m.profile as any;
@@ -90,6 +99,25 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
   const simplify = !!group.simplify_debts;
   const adminCount = (group.members || []).filter((m: any) => m.role === 'admin').length;
 
+  const stats = tripStats(expensesWithParts, allPersons);
+  const shown = filterExpenses(expenses, { query, category: catFilter, payer: payerFilter });
+
+  async function setCurrency(code: string) {
+    const { error } = await createClient().from('groups').update({ currency: code }).eq('id', id);
+    if (error) toast(error.message, 'error');
+    else { toast(`Amounts now shown in ${code}`); refetchGroup(); }
+  }
+
+  function exportCsv() {
+    const csv = expensesCsv(expensesWithParts, allPersons, group!.currency || 'INR');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${group!.name.replace(/[^\w -]/g, '').trim() || 'trip'} expenses.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   async function toggleSimplify(next: boolean) {
     const { error } = await createClient().from('groups').update({ simplify_debts: next }).eq('id', id);
     if (error) toast(error.message, 'error');
@@ -106,13 +134,6 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
   const myTotalShare = expensesWithParts.reduce(
     (s, e) => s + Number(e.participants.find((p) => p.user_id === user.id)?.share_amount ?? 0), 0);
 
-  const byCategory = Object.entries(
-    expenses.reduce<Record<string, number>>((acc, e) => {
-      const k = categoryOf(e.category).key;
-      acc[k] = (acc[k] || 0) + Number(e.amount);
-      return acc;
-    }, {})
-  ).sort((a, b) => b[1] - a[1]);
 
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
 
@@ -165,8 +186,9 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
         <div className="flex">
           {([
             { key: 'expenses', label: 'Expenses', icon: Receipt },
-            { key: 'balances', label: 'Balances', icon: BarChart2 },
-            { key: 'members', label: 'Members', icon: Users },
+            { key: 'balances', label: 'Balances', icon: Scale },
+            { key: 'stats', label: 'Stats', icon: BarChart2 },
+            { key: 'members', label: 'People', icon: Users },
             { key: 'activity', label: 'Activity', icon: History },
           ] as const).map(({ key, label, icon: Icon }) => (
             <button
@@ -176,7 +198,7 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
                 tab === key ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500'
               }`}
             >
-              <Icon size={14} className="shrink-0" />
+              <Icon size={14} className="shrink-0 hidden sm:block" />
               <span className="truncate">{label}</span>
             </button>
           ))}
@@ -196,17 +218,69 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
               action={<Button onClick={() => setShowAddExpense(true)}><Plus size={16} className="mr-1" /> Add expense</Button>}
             />
           ) : (
-            expenses.map((expense) => (
-              <ExpenseCard
-                key={expense.id}
-                expense={expense}
-                currentUserId={user.id}
-                onDelete={changed}
-                onUpdate={changed}
-              />
-            ))
+            <>
+              <div className="space-y-2">
+                <div className="relative">
+                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" aria-hidden />
+                  <input
+                    type="search"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Search expenses"
+                    aria-label="Search expenses"
+                    className="block w-full min-w-0 h-11 pl-9 pr-3 rounded-xl border border-gray-200 bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4">
+                  <select
+                    value={payerFilter ?? ''}
+                    onChange={(e) => setPayerFilter(e.target.value || null)}
+                    aria-label="Filter by who paid"
+                    className={`shrink-0 h-8 rounded-full border px-3 text-sm ${payerFilter ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200'}`}
+                  >
+                    <option value="">Anyone paid</option>
+                    {allPersons.map((p) => <option key={p.id} value={p.id}>{p.id === user.id ? 'You paid' : `${p.name} paid`}</option>)}
+                  </select>
+                  {[...new Set(expenses.map((e) => categoryOf(e.category).key))].map((k) => {
+                    const c = categoryOf(k);
+                    return (
+                      <button
+                        key={k}
+                        onClick={() => setCatFilter(catFilter === k ? null : k)}
+                        className={`shrink-0 h-8 px-3 rounded-full border text-sm whitespace-nowrap ${catFilter === k ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200'}`}
+                      >
+                        {c.emoji} {c.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                {(query || catFilter || payerFilter) && (
+                  <p className="text-xs text-gray-500 px-1">
+                    {shown.length} of {expenses.length} expenses · {formatCurrency(shown.reduce((s, e) => s + Number(e.amount), 0))}
+                    <button onClick={() => { setQuery(''); setCatFilter(null); setPayerFilter(null); }} className="ml-2 text-blue-600 font-medium">Clear</button>
+                  </p>
+                )}
+              </div>
+              {shown.length === 0 ? (
+                <p className="text-sm text-gray-500 text-center py-8">No expenses match.</p>
+              ) : shown.map((expense) => (
+                <ExpenseCard
+                  key={expense.id}
+                  expense={expense}
+                  currentUserId={user.id}
+                  onDelete={changed}
+                  onUpdate={changed}
+                />
+              ))}
+              <button onClick={exportCsv} className="w-full flex items-center justify-center gap-2 h-10 rounded-xl border border-gray-200 bg-white text-sm font-medium text-gray-700">
+                <Download size={15} /> Export expenses (CSV)
+              </button>
+            </>
           )
         )}
+
+        {/* Stats tab */}
+        {tab === 'stats' && <TripStatsPanel stats={stats} me={user.id} />}
 
         {/* Balances tab */}
         {tab === 'balances' && (
@@ -247,30 +321,6 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
               </Card>
             )}
 
-            {byCategory.length > 0 && (
-              <Card>
-                <h3 className="font-semibold text-gray-900 mb-3">Where the money went</h3>
-                <div className="space-y-2.5">
-                  {byCategory.map(([k, amt]) => {
-                    const c = categoryOf(k);
-                    return (
-                      <div key={k}>
-                        <div className="flex justify-between text-sm mb-1">
-                          <span className="text-gray-700">{c.emoji} {c.label}</span>
-                          <span className="font-medium text-gray-900">{formatCurrency(amt)}</span>
-                        </div>
-                        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                          <div className="h-full bg-blue-500 rounded-full" style={{ width: `${(amt / totalExpenses) * 100}%` }} />
-                        </div>
-                      </div>
-                    );
-                  })}
-                  <p className="text-xs text-gray-500 pt-1">
-                    {allPersons.length} people · avg {formatCurrency(allPersons.length ? totalExpenses / allPersons.length : 0)} per head
-                  </p>
-                </div>
-              </Card>
-            )}
           </div>
         )}
 
@@ -284,9 +334,13 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
           <div className="space-y-3">
             <InviteCard inviteCode={group.invite_code} groupName={group.name} />
             {isAdmin && (
-              <p className="text-xs text-gray-500 px-1">
-                You&apos;re an admin: you can make others admin below, and turn on simplified payments in Balances.
-              </p>
+              <Card>
+                <h3 className="font-semibold text-gray-900 mb-3">Group settings</h3>
+                <CurrencySelect id="group-currency" value={group.currency || 'INR'} onChange={setCurrency} />
+                <p className="text-xs text-gray-500 mt-3">
+                  Admins can also make others admin below, and turn on simplified payments in Balances.
+                </p>
+              </Card>
             )}
             <AddPeopleCard
               groupId={id}

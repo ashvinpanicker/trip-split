@@ -2,22 +2,25 @@
 
 import { useState } from 'react';
 import { format } from 'date-fns';
-import { MoreVertical, Edit2, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { MoreVertical, Edit2, Trash2, ChevronDown, ChevronUp, Paperclip } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import Avatar from '@/components/ui/Avatar';
 import { useToast } from '@/components/ui/Toast';
 import { formatCurrency, categoryOf, payerIdOf } from '@/lib/utils/balance';
 import type { Expense } from '@/types';
 import AddExpenseModal from './AddExpenseModal';
+import ReceiptPhoto from './ReceiptPhoto';
 
 interface ExpenseCardProps {
   expense: Expense;
   currentUserId: string;
   onDelete?: () => void;
   onUpdate?: () => void;
+  /** Override the display currency (e.g. on the dashboard, where groups differ) */
+  currency?: string;
 }
 
-export default function ExpenseCard({ expense, currentUserId, onDelete, onUpdate }: ExpenseCardProps) {
+export default function ExpenseCard({ expense, currentUserId, onDelete, onUpdate, currency }: ExpenseCardProps) {
   const { toast } = useToast();
   const supabase = createClient();
   const [expanded, setExpanded] = useState(false);
@@ -60,6 +63,7 @@ export default function ExpenseCard({ expense, currentUserId, onDelete, onUpdate
     category: expense.category,
     split_type: expense.split_type,
     notes: expense.notes,
+    items: expense.items ?? null,
     participants: (expense.participants || []).map((p) => ({
       user_id: p.user_id,
       pending_member_id: p.pending_member_id,
@@ -85,11 +89,11 @@ export default function ExpenseCard({ expense, currentUserId, onDelete, onUpdate
               </div>
               <div className="flex items-center gap-1 flex-shrink-0">
                 <div className="text-right">
-                  <p className="font-bold text-gray-900">{formatCurrency(expense.amount)}</p>
+                  <p className="font-bold text-gray-900">{formatCurrency(expense.amount, currency)}</p>
                   {isMyExpense ? (
                     <p className="text-xs text-green-600 font-medium">you paid</p>
                   ) : myShare > 0 ? (
-                    <p className="text-xs text-red-500 font-medium">you owe {formatCurrency(myShare)}</p>
+                    <p className="text-xs text-red-500 font-medium">you owe {formatCurrency(myShare, currency)}</p>
                   ) : null}
                 </div>
                 <div className="relative">
@@ -132,15 +136,29 @@ export default function ExpenseCard({ expense, currentUserId, onDelete, onUpdate
               className="flex items-center gap-1 mt-2 text-xs text-blue-600"
             >
               {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-              {expense.participants?.length || 0} participants · {expense.split_type} split
+              {expense.participants?.length || 0} participants · {expense.items ? 'itemized bill' : `${expense.split_type} split`}
+              {expense.receipt_path && <Paperclip size={12} className="ml-1" />}
             </button>
           </div>
         </div>
 
-        {expanded && expense.participants && expense.participants.length > 0 && (
+        {expanded && (
           <div className="px-4 pb-4 border-t border-gray-50 pt-3">
+            {expense.items && expense.items.items.length > 0 && (
+              <div className="mb-3 space-y-1 text-xs text-gray-500">
+                {expense.items.items.map((it, i) => (
+                  <div key={i} className="flex justify-between gap-2">
+                    <span className="truncate">{it.name || 'Item'} · {it.people.length} {it.people.length === 1 ? 'person' : 'people'}</span>
+                    <span>{formatCurrency(it.price, currency)}</span>
+                  </div>
+                ))}
+                {expense.items.extra !== 0 && (
+                  <div className="flex justify-between"><span>Tax / service / tip</span><span>{formatCurrency(expense.items.extra, currency)}</span></div>
+                )}
+              </div>
+            )}
             <div className="space-y-2">
-              {expense.participants.map((p) => {
+              {(expense.participants ?? []).map((p) => {
                 const profile = p.profile as any;
                 const name = profile?.full_name || profile?.email || p.pending_member?.name || 'Unknown';
                 const pid = p.user_id ?? p.pending_member_id;
@@ -153,11 +171,12 @@ export default function ExpenseCard({ expense, currentUserId, onDelete, onUpdate
                         <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">paid</span>
                       )}
                     </div>
-                    <span className="text-sm font-medium text-gray-900">{formatCurrency(p.share_amount)}</span>
+                    <span className="text-sm font-medium text-gray-900">{formatCurrency(p.share_amount, currency)}</span>
                   </div>
                 );
               })}
             </div>
+            <ReceiptPhoto expenseId={expense.id} groupId={expense.group_id} path={expense.receipt_path} onChange={onUpdate} />
           </div>
         )}
       </div>

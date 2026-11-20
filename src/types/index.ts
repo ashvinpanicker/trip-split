@@ -30,6 +30,7 @@ export interface Group {
   created_by: string | null;
   invite_code: string;
   simplify_debts?: boolean;
+  currency?: string;
   created_at: string;
   updated_at: string;
   member_count?: number;
@@ -58,6 +59,9 @@ export interface Expense {
   category?: string | null;
   split_type: SplitType;
   notes: string | null;
+  /** Itemized bill (people are person ids), kept so the bill can be re-edited */
+  items?: { items: { name: string; price: number; people: string[] }[]; extra: number } | null;
+  receipt_path?: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;

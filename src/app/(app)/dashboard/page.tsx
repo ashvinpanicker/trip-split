@@ -11,7 +11,7 @@ import ExpenseCard from '@/components/expenses/ExpenseCard';
 import { useUser } from '@/hooks/useUser';
 import { useGroups } from '@/hooks/useGroups';
 import { useAllExpenses, useMyTotals } from '@/hooks/useExpenses';
-import { formatCurrency, myNetByGroup, toPaise } from '@/lib/utils/balance';
+import { formatCurrency, myNetByGroup, totalsByCurrency } from '@/lib/utils/balance';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -22,12 +22,13 @@ export default function DashboardPage() {
 
   if (!user) return null;
 
-  // Same maths as the group pages: per-group net (incl. recorded payments), then summed
-  const perGroup = Object.values(myNetByGroup(user.id, totals.expenses, totals.payments));
-  const totalOwed = perGroup.filter((v) => v > 0).reduce((s, v) => s + toPaise(v), 0) / 100;
-  const totalOwe = -perGroup.filter((v) => v < 0).reduce((s, v) => s + toPaise(v), 0) / 100;
-
-  const net = (toPaise(totalOwed) - toPaise(totalOwe)) / 100;
+  // Same maths as the group pages: per-group net (incl. recorded payments), summed per currency
+  const currencyOf = (gid: string) => groups.find((g) => g.id === gid)?.currency || 'INR';
+  const byCurrency = Object.entries(totalsByCurrency(myNetByGroup(user.id, totals.expenses, totals.payments), currencyOf))
+    .sort((a, b) => Number(b[0] === 'INR') - Number(a[0] === 'INR'));
+  const [mainCode, main] = byCurrency[0] ?? ['INR', { owed: 0, owe: 0, net: 0 }];
+  const others = byCurrency.slice(1);
+  const net = main.net, totalOwed = main.owed, totalOwe = main.owe;
 
   return (
     <div className="flex flex-col">
@@ -42,23 +43,28 @@ export default function DashboardPage() {
         <Card className="bg-gradient-to-br from-blue-600 to-blue-700 border-0 text-white">
           <p className="text-blue-100 text-sm mb-1">Net Balance</p>
           <p className={`text-3xl font-bold mb-3 ${net >= 0 ? 'text-white' : 'text-red-200'}`}>
-            {net >= 0 ? '+' : ''}{formatCurrency(net)}
+            {net >= 0 ? '+' : ''}{formatCurrency(net, mainCode)}
           </p>
           <div className="flex gap-4">
             <div>
               <div className="flex items-center gap-1 text-blue-200 text-xs mb-0.5">
                 <TrendingUp size={12} /> You are owed
               </div>
-              <p className="text-white font-semibold">{formatCurrency(totalOwed)}</p>
+              <p className="text-white font-semibold">{formatCurrency(totalOwed, mainCode)}</p>
             </div>
             <div className="w-px bg-blue-500" />
             <div>
               <div className="flex items-center gap-1 text-blue-200 text-xs mb-0.5">
                 <TrendingDown size={12} /> You owe
               </div>
-              <p className="text-white font-semibold">{formatCurrency(totalOwe)}</p>
+              <p className="text-white font-semibold">{formatCurrency(totalOwe, mainCode)}</p>
             </div>
           </div>
+          {others.length > 0 && (
+            <p className="text-blue-100 text-xs mt-3">
+              Other trips: {others.map(([c, t]) => `${t.net >= 0 ? '+' : ''}${formatCurrency(t.net, c)}`).join(' · ')}
+            </p>
+          )}
         </Card>
 
         {/* Groups quick access */}
@@ -109,6 +115,7 @@ export default function DashboardPage() {
                   key={expense.id}
                   expense={expense}
                   currentUserId={user.id}
+                  currency={currencyOf(expense.group_id)}
                 />
               ))}
             </div>

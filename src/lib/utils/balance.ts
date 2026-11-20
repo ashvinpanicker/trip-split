@@ -54,6 +54,20 @@ export function calculateGroupBalances(
   }));
 }
 
+/** Sum per-group nets into totals per currency (amounts in different currencies are never added together). */
+export function totalsByCurrency(perGroup: Record<string, number>, currencyOf: (groupId: string) => string) {
+  const out: Record<string, { owed: number; owe: number; net: number }> = {};
+  for (const [g, v] of Object.entries(perGroup)) {
+    const c = currencyOf(g);
+    const t = (out[c] ??= { owed: 0, owe: 0, net: 0 });
+    const p = toPaise(v);
+    if (p > 0) t.owed += p; else t.owe -= p;
+    t.net += p;
+  }
+  for (const t of Object.values(out)) { t.owed /= 100; t.owe /= 100; t.net /= 100; }
+  return out;
+}
+
 /**
  * My net balance per group (rupees): positive = I'm owed. Same rules as calculateGroupBalances,
  * just for one person, so the dashboard and the group page always agree.
@@ -289,6 +303,47 @@ export function calculatePercentageSplits(totalAmount: number, percentages: Reco
   return Object.fromEntries(floors.map((r) => [r.k, toRupees(r.paise)]));
 }
 
+export type BillItem = { name: string; price: number; people: string[] };
+
+/** Split `total` paise across keys in proportion to `weights`, largest remainder first. Always sums to total. */
+function allocate(total: number, weights: Record<string, number>): Record<string, number> {
+  const keys = Object.keys(weights);
+  const W = keys.reduce((s, k) => s + weights[k], 0);
+  if (!keys.length || W <= 0) return Object.fromEntries(keys.map((k) => [k, 0]));
+  const sign = total < 0 ? -1 : 1;
+  const abs = Math.abs(total);
+  const raw = keys.map((k) => ({ k, exact: (abs * weights[k]) / W }));
+  const out = raw.map((r) => ({ ...r, p: Math.floor(r.exact + 1e-9) }));
+  let left = abs - out.reduce((s, r) => s + r.p, 0);
+  [...out].sort((a, b) => (b.exact - b.p) - (a.exact - a.p)).forEach((r) => { if (left > 0) { r.p += 1; left -= 1; } });
+  return Object.fromEntries(out.map((r) => [r.k, sign * r.p]));
+}
+
+/**
+ * Itemized bill: each item is shared equally by the people who had it; `extra` (tax, service,
+ * tip, or a negative discount) is spread in proportion to what each person ordered.
+ * Returns per-person shares in rupees that sum exactly to `total`.
+ */
+export function itemizedShares(items: BillItem[], extra = 0): { shares: Record<string, number>; subtotal: number; total: number } {
+  const sub: Record<string, number> = {};
+  let subtotal = 0;
+  for (const it of items) {
+    const price = toPaise(it.price);
+    if (price <= 0 || it.people.length === 0) continue;
+    subtotal += price;
+    const base = Math.floor(price / it.people.length);
+    let rem = price - base * it.people.length;
+    for (const k of it.people) {
+      sub[k] = (sub[k] || 0) + base + (rem > 0 ? 1 : 0);
+      if (rem > 0) rem -= 1;
+    }
+  }
+  const extraP = toPaise(extra);
+  const spread = allocate(extraP, sub);
+  const shares = Object.fromEntries(Object.keys(sub).map((k) => [k, toRupees(sub[k] + (spread[k] || 0))]));
+  return { shares, subtotal: toRupees(subtotal), total: toRupees(subtotal + extraP) };
+}
+
 export type SplitEntry = { key: string; percentage?: string | number; amount?: string | number };
 
 /** Shares (in rupees) for the included people, by split type. */
@@ -325,13 +380,54 @@ export function validateSplit(splitType: SplitType, totalAmount: number, entries
   return null;
 }
 
-export function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount);
+/** Currencies a group can display in. Symbol only: amounts are never converted. */
+export const CURRENCIES = [
+  { code: 'INR', label: 'Indian rupee' },
+  { code: 'USD', label: 'US dollar' },
+  { code: 'EUR', label: 'Euro' },
+  { code: 'GBP', label: 'British pound' },
+  { code: 'AED', label: 'UAE dirham' },
+  { code: 'THB', label: 'Thai baht' },
+  { code: 'SGD', label: 'Singapore dollar' },
+  { code: 'MYR', label: 'Malaysian ringgit' },
+  { code: 'IDR', label: 'Indonesian rupiah' },
+  { code: 'VND', label: 'Vietnamese dong' },
+  { code: 'LKR', label: 'Sri Lankan rupee' },
+  { code: 'NPR', label: 'Nepalese rupee' },
+  { code: 'BTN', label: 'Bhutanese ngultrum' },
+  { code: 'KRW', label: 'South Korean won' },
+  { code: 'JPY', label: 'Japanese yen' },
+  { code: 'AUD', label: 'Australian dollar' },
+  { code: 'CAD', label: 'Canadian dollar' },
+] as const;
+
+/** Currency used by formatCurrency when none is passed: the group currently on screen. */
+let activeCurrency = 'INR';
+export function setActiveCurrency(code?: string | null) {
+  activeCurrency = code && /^[A-Z]{3}$/.test(code) ? code : 'INR';
+}
+export const getActiveCurrency = () => activeCurrency;
+
+const formatters = new Map<string, Intl.NumberFormat>();
+export function formatCurrency(amount: number, code: string = activeCurrency): string {
+  let f = formatters.get(code);
+  if (!f) {
+    const noDecimals = ['KRW', 'JPY', 'VND', 'IDR'].includes(code);
+    f = new Intl.NumberFormat(code === 'INR' ? 'en-IN' : 'en-US', {
+      style: 'currency',
+      currency: code,
+      currencyDisplay: 'narrowSymbol',
+      minimumFractionDigits: noDecimals ? 0 : 2,
+      maximumFractionDigits: 2,
+    });
+    formatters.set(code, f);
+  }
+  return f.format(amount);
+}
+
+/** Just the symbol, e.g. "₹", "$", "₩". */
+export function currencySymbol(code: string = activeCurrency): string {
+  return formatCurrency(0, code).replace(/[\d.,\s]/g, '') || code;
 }
 
 export const CATEGORIES = [

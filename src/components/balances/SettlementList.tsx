@@ -5,7 +5,7 @@ import { ArrowRight, Check, Smartphone } from 'lucide-react';
 import Avatar from '@/components/ui/Avatar';
 import { useToast } from '@/components/ui/Toast';
 import { createClient } from '@/lib/supabase/client';
-import { formatCurrency, upiLink } from '@/lib/utils/balance';
+import { formatCurrency, getActiveCurrency, upiLink } from '@/lib/utils/balance';
 import type { Settlement } from '@/types';
 
 interface SettlementListProps {
@@ -66,7 +66,8 @@ export default function SettlementList({
       {settlements.map((s, i) => {
         const isYouPaying = s.from_id === currentUserId;
         const isYouReceiving = s.to_id === currentUserId;
-        const receiverUpi = upiIds[s.to_id];
+        // UPI only moves rupees
+        const receiverUpi = getActiveCurrency() === 'INR' ? upiIds[s.to_id] : null;
 
         return (
           <div

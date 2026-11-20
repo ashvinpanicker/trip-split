@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { Calendar, Check, UserPlus, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
-import { computeShares as computeSharesFor, validateSplit, CATEGORIES } from '@/lib/utils/balance';
+import { computeShares as computeSharesFor, validateSplit, itemizedShares, CATEGORIES, currencySymbol, formatCurrency, getActiveCurrency } from '@/lib/utils/balance';
+import ItemizedEditor, { type DraftBill } from './ItemizedEditor';
 import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
@@ -25,6 +26,7 @@ interface AddExpenseModalProps {
     paid_by: string | null;
     paid_by_pending?: string | null;
     category?: string | null;
+    items?: { items: { name: string; price: number; people: string[] }[]; extra: number } | null;
     split_type: SplitType;
     notes: string | null;
     participants: { user_id: string | null; pending_member_id: string | null; share_amount: number; share_percentage: number | null }[];
@@ -41,6 +43,9 @@ export default function AddExpenseModal({
   const [step, setStep] = useState<'group' | 'form'>(initialGroupId ? 'form' : 'group');
   const [groups, setGroups] = useState<Group[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(initialGroupId);
+  // Money in this form uses the chosen group's currency (falls back to the one on screen)
+  const cur = groups.find((g) => g.id === selectedGroupId)?.currency || getActiveCurrency();
+  const sym = currencySymbol(cur);
   const [currentUserId, setCurrentUserId] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -52,6 +57,14 @@ export default function AddExpenseModal({
   const [category, setCategory] = useState(expense?.category ?? 'food');
   const [splitType, setSplitType] = useState<SplitType>(expense?.split_type ?? 'equal');
   const [notes, setNotes] = useState(expense?.notes ?? '');
+  // Itemized bill mode (saved as an exact split, with the items kept for re-editing)
+  const [itemMode, setItemMode] = useState(!!expense?.items);
+  const emptyBill = (): DraftBill => ({ items: [{ name: '', price: '', people: [] }], extra: '' });
+  const [bill, setBill] = useState<DraftBill>(
+    expense?.items
+      ? { items: expense.items.items.map((i) => ({ name: i.name, price: String(i.price), people: i.people })), extra: expense.items.extra ? String(expense.items.extra) : '' }
+      : emptyBill()
+  );
   const [participants, setParticipants] = useState<ParticipantEntry[]>([]);
 
   // Add person inline
@@ -69,7 +82,7 @@ export default function AddExpenseModal({
       if (!initialGroupId) {
         const { data } = await supabase
           .from('group_members')
-          .select('group:groups(id, name, description, invite_code, created_at, updated_at, created_by)')
+          .select('group:groups(id, name, description, invite_code, currency, created_at, updated_at, created_by)')
           .eq('user_id', user.id);
         if (data) setGroups(data.map((d: any) => d.group).filter(Boolean));
       }
@@ -149,13 +162,31 @@ export default function AddExpenseModal({
     return getIncluded().map((p) => ({ key: p.key, percentage: p.percentage, amount: p.amount }));
   }
 
-  function computeShares() {
+  function billResult() {
+    return itemizedShares(
+      bill.items.map((i) => ({ name: i.name.trim(), price: parseFloat(i.price) || 0, people: i.people })),
+      parseFloat(bill.extra) || 0
+    );
+  }
+
+  function computeShares(): Record<string, number> {
+    if (itemMode) {
+      // itemizedShares works in person ids; the form keys people by p.key
+      const byId = billResult().shares;
+      return Object.fromEntries(participants.filter((p) => byId[p.id] !== undefined).map((p) => [p.key, byId[p.id]]));
+    }
     return computeSharesFor(splitType, parseFloat(amount) || 0, splitEntries());
   }
 
   function validate(): string | null {
     if (!title.trim()) return 'Enter a title';
     if (!paidBy) return 'Select who paid';
+    if (itemMode) {
+      if (!bill.items.some((i) => (parseFloat(i.price) || 0) > 0 && i.people.length)) return 'Add at least one item with a price and who had it';
+      if (bill.items.some((i) => (parseFloat(i.price) || 0) > 0 && !i.people.length)) return 'Every item needs at least one person';
+      const shares = computeShares();
+      return validateSplit('fixed', billResult().total, Object.entries(shares).map(([key, amount]) => ({ key, amount })));
+    }
     return validateSplit(splitType, parseFloat(amount) || 0, splitEntries());
   }
 
@@ -197,7 +228,8 @@ export default function AddExpenseModal({
 
     setLoading(true);
     const shares = computeShares();
-    const included = getIncluded();
+    const included = itemMode ? participants.filter((p) => shares[p.key] !== undefined) : getIncluded();
+    const total = itemMode ? billResult().total : parseFloat(amount);
 
     try {
       const payer = participants.find((p) => p.id === paidBy);
@@ -209,7 +241,7 @@ export default function AddExpenseModal({
         user_id: p.type === 'user' ? p.id : null,
         pending_member_id: p.type === 'pending' ? p.id : null,
         share_amount: shares[p.key],
-        share_percentage: splitType === 'percentage' ? parseFloat(p.percentage) || null : null,
+        share_percentage: !itemMode && splitType === 'percentage' ? parseFloat(p.percentage) || null : null,
       }));
 
       // One atomic call: expense + split saved together, and the DB rejects splits that don't add up
@@ -217,14 +249,20 @@ export default function AddExpenseModal({
         p_expense_id: isEditing && expense ? expense.id : null,
         p_group_id: selectedGroupId,
         p_title: title.trim(),
-        p_amount: parseFloat(amount),
+        p_amount: total,
         p_date: date,
         p_paid_by: payerFields.paid_by,
         p_paid_by_pending: payerFields.paid_by_pending,
         p_category: category,
-        p_split_type: splitType,
+        p_split_type: itemMode ? 'fixed' : splitType,
         p_notes: notes || null,
         p_participants: participantsData,
+        p_items: itemMode
+          ? {
+              items: bill.items.filter((i) => (parseFloat(i.price) || 0) > 0).map((i) => ({ name: i.name.trim(), price: parseFloat(i.price), people: i.people })),
+              extra: parseFloat(bill.extra) || 0,
+            }
+          : null,
       });
       if (error) throw error;
       toast(isEditing ? 'Expense updated' : 'Expense added');
@@ -242,6 +280,7 @@ export default function AddExpenseModal({
   function resetForm() {
     setTitle(''); setAmount(''); setDate(format(new Date(), 'yyyy-MM-dd'));
     setPaidBy(''); setSplitType('equal'); setNotes(''); setCategory('food');
+    setItemMode(false); setBill(emptyBill());
     setParticipants([]); setShowAddPerson(false); setNewPersonName('');
     if (!initialGroupId) { setStep('group'); setSelectedGroupId(null); }
   }
@@ -289,13 +328,14 @@ export default function AddExpenseModal({
 
         <div className="grid grid-cols-2 gap-3">
           <Input
-            label="Amount (₹)"
+            label={`Amount (${sym})`}
             type="number"
             inputMode="decimal"
             placeholder="0.00"
-            value={amount}
+            value={itemMode ? (billResult().total ? billResult().total.toFixed(2) : '') : amount}
             onChange={(e) => setAmount(e.target.value)}
-            leftIcon={<span className="text-sm font-medium">₹</span>}
+            readOnly={itemMode}
+            leftIcon={<span className="text-sm font-medium">{sym}</span>}
             min="0.01"
             step="0.01"
             required
@@ -359,20 +399,46 @@ export default function AddExpenseModal({
               <button
                 key={type}
                 type="button"
-                onClick={() => setSplitType(type)}
-                className={`flex-1 py-2 rounded-xl border text-sm font-medium capitalize transition-colors ${
-                  splitType === type
+                onClick={() => { setSplitType(type); setItemMode(false); }}
+                className={`flex-1 min-w-0 py-2 rounded-xl border text-sm font-medium capitalize transition-colors ${
+                  !itemMode && splitType === type
                     ? 'bg-blue-600 text-white border-blue-600'
                     : 'bg-white text-gray-700 border-gray-200'
                 }`}
               >
-                {type}
+                {type === 'percentage' ? '%' : type === 'fixed' ? 'Exact' : 'Equal'}
               </button>
             ))}
+            <button
+              type="button"
+              onClick={() => {
+                setItemMode(true);
+                // New items default to everyone on the trip
+                setBill((b) => b.items.length === 1 && !b.items[0].name && !b.items[0].price
+                  ? { ...b, items: [{ name: '', price: '', people: participants.map((p) => p.id) }] } : b);
+              }}
+              className={`flex-1 min-w-0 py-2 rounded-xl border text-sm font-medium transition-colors ${
+                itemMode ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200'
+              }`}
+            >
+              Items
+            </button>
           </div>
         </div>
 
         {/* Participants */}
+        {itemMode ? (
+          <div>
+            <label className="text-sm font-medium text-gray-700 mb-2 block">Items on the bill</label>
+            <ItemizedEditor
+              people={participants.map((p) => ({ id: p.id, name: p.id === currentUserId ? `${p.name} (you)` : p.name }))}
+              bill={bill}
+              onChange={setBill}
+              currency={cur}
+              symbol={sym}
+            />
+          </div>
+        ) : (
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className="text-sm font-medium text-gray-700">
@@ -426,7 +492,7 @@ export default function AddExpenseModal({
                   )}
                   {p.included && splitType === 'fixed' && (
                     <div className="flex items-center gap-1">
-                      <span className="text-gray-500 text-sm">₹</span>
+                      <span className="text-gray-500 text-sm">{sym}</span>
                       <input
                         type="number"
                         value={p.amount}
@@ -438,7 +504,7 @@ export default function AddExpenseModal({
                     </div>
                   )}
                   {p.included && splitType === 'equal' && share !== undefined && (
-                    <span className="text-sm text-gray-500">₹{share.toFixed(2)}</span>
+                    <span className="text-sm text-gray-500">{formatCurrency(share, cur)}</span>
                   )}
                   {!p.included && <span className="text-xs text-gray-400">Excluded</span>}
                 </div>
@@ -485,6 +551,7 @@ export default function AddExpenseModal({
             )}
           </div>
         </div>
+        )}
 
         <Input
           label="Notes (optional)"

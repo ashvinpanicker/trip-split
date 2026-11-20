@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import CurrencySelect from './CurrencySelect';
 import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
@@ -18,6 +19,7 @@ export default function CreateGroupModal({ open, onClose, onSuccess }: CreateGro
   const supabase = createClient();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [currency, setCurrency] = useState('INR');
   const [loading, setLoading] = useState(false);
 
   async function handleCreate(e: React.FormEvent) {
@@ -35,7 +37,7 @@ export default function CreateGroupModal({ open, onClose, onSuccess }: CreateGro
 
     const { error: groupErr } = await supabase
       .from('groups')
-      .insert({ id: groupId, name: name.trim(), description: description.trim() || null, created_by: user.id });
+      .insert({ id: groupId, name: name.trim(), description: description.trim() || null, currency, created_by: user.id });
 
     if (groupErr) {
       toast(groupErr.message, 'error');
@@ -78,6 +80,7 @@ export default function CreateGroupModal({ open, onClose, onSuccess }: CreateGro
           value={description}
           onChange={(e) => setDescription(e.target.value)}
         />
+        <CurrencySelect value={currency} onChange={setCurrency} />
         <div className="flex gap-3">
           <Button type="button" variant="secondary" fullWidth onClick={onClose}>Cancel</Button>
           <Button type="submit" fullWidth loading={loading}>Create</Button>
