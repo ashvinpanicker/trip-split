@@ -54,6 +54,35 @@ export function calculateGroupBalances(
   }));
 }
 
+/**
+ * My net balance per group (rupees): positive = I'm owed. Same rules as calculateGroupBalances,
+ * just for one person, so the dashboard and the group page always agree.
+ */
+export function myNetByGroup(
+  me: string,
+  expenses: (Pick<Expense, 'group_id' | 'paid_by' | 'paid_by_pending'> & { participants: Pick<ExpenseParticipant, 'user_id' | 'pending_member_id' | 'share_amount'>[] })[],
+  payments: Pick<SettlementRecord, 'group_id' | 'from_person' | 'to_person' | 'amount'>[] = []
+): Record<string, number> {
+  const net: Record<string, number> = {};
+  const bump = (g: string, paise: number) => { net[g] = (net[g] || 0) + paise; };
+  for (const e of expenses) {
+    const payer = payerIdOf(e);
+    if (!payer) continue;
+    for (const p of e.participants) {
+      const id = p.user_id ?? p.pending_member_id;
+      if (!id || id === payer) continue;
+      const share = toPaise(p.share_amount);
+      if (payer === me) bump(e.group_id, share);
+      if (id === me) bump(e.group_id, -share);
+    }
+  }
+  for (const s of payments) {
+    if (s.from_person === me) bump(s.group_id, toPaise(s.amount));
+    if (s.to_person === me) bump(s.group_id, -toPaise(s.amount));
+  }
+  return Object.fromEntries(Object.entries(net).map(([g, v]) => [g, toRupees(v)]));
+}
+
 /** Settle a set of balances that sum to zero with greedy largest-debtor → largest-creditor matching. */
 function greedySettle(people: { id: string; name: string; cents: number }[]): Settlement[] {
   const cred = people.filter((p) => p.cents > 0).map((p) => ({ ...p })).sort((a, b) => b.cents - a.cents);

@@ -79,13 +79,13 @@ export default function BalancesPage() {
       <AppHeader title="Balances" />
       <div className="p-4 space-y-4">
         {myBalance && (
-          <Card className={myBalance.net_balance > 0.01 ? 'bg-green-50 border-green-100' : myBalance.net_balance < -0.01 ? 'bg-red-50 border-red-100' : 'bg-gray-50 border-gray-100'}>
+          <Card className={myBalance.net_balance > 0 ? 'bg-green-50 border-green-100' : myBalance.net_balance < 0 ? 'bg-red-50 border-red-100' : 'bg-gray-50 border-gray-100'}>
             <p className="text-sm text-gray-600 mb-1">Your overall balance</p>
-            <p className={`text-3xl font-bold ${myBalance.net_balance > 0.01 ? 'text-green-700' : myBalance.net_balance < -0.01 ? 'text-red-600' : 'text-gray-600'}`}>
-              {myBalance.net_balance > 0.01 ? `+${formatCurrency(myBalance.net_balance)}` : myBalance.net_balance < -0.01 ? formatCurrency(myBalance.net_balance) : 'All settled up!'}
+            <p className={`text-3xl font-bold ${myBalance.net_balance > 0 ? 'text-green-700' : myBalance.net_balance < 0 ? 'text-red-600' : 'text-gray-600'}`}>
+              {myBalance.net_balance > 0 ? `+${formatCurrency(myBalance.net_balance)}` : myBalance.net_balance < 0 ? formatCurrency(myBalance.net_balance) : 'All settled up!'}
             </p>
             <p className="text-sm text-gray-500 mt-1">
-              {myBalance.net_balance > 0.01 ? 'You are owed across all groups' : myBalance.net_balance < -0.01 ? 'You owe across all groups' : 'No outstanding balances'}
+              {myBalance.net_balance > 0 ? 'You are owed across all groups' : myBalance.net_balance < 0 ? 'You owe across all groups' : 'No outstanding balances'}
             </p>
           </Card>
         )}

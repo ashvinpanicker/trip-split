@@ -8,6 +8,7 @@ import {
   smartSettle,
   directDebts,
   toPaise,
+  myNetByGroup,
   type BalancePerson,
 } from './balance';
 import type { Balance, Settlement } from '@/types';
@@ -343,5 +344,33 @@ describe('directDebts', () => {
       expect(Object.values(leftover(b, direct)).every((v) => v === 0)).toBe(true);
       expect(smartSettle(b).length).toBeLessThanOrEqual(direct.length);
     }
+  });
+});
+
+// ── dashboard totals ──────────────────────────────────────────────────
+describe('myNetByGroup', () => {
+  const withGroup = (g: string, e: Exp) => ({ ...e, group_id: g });
+
+  it('agrees with the group page for every person, every group — 300 random trips', () => {
+    const r = rng(8);
+    const ps = people(...[...Array(9)].map((_, i) => `p${i}`));
+    for (let t = 0; t < 300; t++) {
+      const exps = [...Array(1 + Math.floor(r() * 20))].map(() =>
+        withGroup(r() < 0.5 ? 'g1' : 'g2', exp(ps[Math.floor(r() * 9)].id, Math.round(r() * 300_000) / 100 + 1, ps.filter(() => r() < 0.5).map((p) => p.id).concat('p4'))));
+      const pays = [{ group_id: 'g1', from_person: 'p1', to_person: 'p0', amount: 123.45 }];
+      for (const g of ['g1', 'g2']) {
+        const groupBal = netOf(calculateGroupBalances(exps.filter((e) => e.group_id === g), ps, pays.filter((p) => p.group_id === g)));
+        for (const p of ps) expect(myNetByGroup(p.id, exps, pays)[g] ?? 0).toBe(groupBal[p.id]);
+      }
+    }
+  });
+
+  it('counts money I paid for others even when I am not in the split', () => {
+    expect(myNetByGroup('A', [withGroup('g', exp('A', 1000, ['B', 'C']))])).toEqual({ g: 1000 });
+  });
+
+  it('recorded payments clear the dashboard too', () => {
+    const e = [withGroup('g', exp('A', 1000, ['A', 'B']))];
+    expect(myNetByGroup('A', e, [{ group_id: 'g', from_person: 'B', to_person: 'A', amount: 500 }])).toEqual({ g: 0 });
   });
 });

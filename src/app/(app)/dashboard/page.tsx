@@ -10,38 +10,24 @@ import EmptyState from '@/components/ui/EmptyState';
 import ExpenseCard from '@/components/expenses/ExpenseCard';
 import { useUser } from '@/hooks/useUser';
 import { useGroups } from '@/hooks/useGroups';
-import { useAllExpenses } from '@/hooks/useExpenses';
-import { formatCurrency } from '@/lib/utils/balance';
+import { useAllExpenses, useMyTotals } from '@/hooks/useExpenses';
+import { formatCurrency, myNetByGroup, toPaise } from '@/lib/utils/balance';
 
 export default function DashboardPage() {
   const router = useRouter();
   const { user } = useUser();
   const { groups } = useGroups();
   const { expenses, loading: expLoading } = useAllExpenses();
+  const totals = useMyTotals();
 
   if (!user) return null;
 
-  // Simple dashboard balance: sum up what user owes vs is owed across all expenses
-  let totalOwed = 0;
-  let totalOwe = 0;
+  // Same maths as the group pages: per-group net (incl. recorded payments), then summed
+  const perGroup = Object.values(myNetByGroup(user.id, totals.expenses, totals.payments));
+  const totalOwed = perGroup.filter((v) => v > 0).reduce((s, v) => s + toPaise(v), 0) / 100;
+  const totalOwe = -perGroup.filter((v) => v < 0).reduce((s, v) => s + toPaise(v), 0) / 100;
 
-  for (const exp of expenses) {
-    const myPart = exp.participants?.find((p) => p.user_id === user.id);
-    if (!myPart) continue;
-
-    if (exp.paid_by === user.id) {
-      // User paid — others owe user
-      const othersShare = (exp.participants || [])
-        .filter((p) => p.user_id !== user.id)
-        .reduce((s, p) => s + p.share_amount, 0);
-      totalOwed += othersShare;
-    } else {
-      // Someone else paid — user owes their share
-      totalOwe += myPart.share_amount;
-    }
-  }
-
-  const net = totalOwed - totalOwe;
+  const net = (toPaise(totalOwed) - toPaise(totalOwe)) / 100;
 
   return (
     <div className="flex flex-col">

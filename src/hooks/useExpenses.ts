@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import type { Expense, SettlementRecord } from '@/types';
+import type { Expense, ExpenseParticipant, SettlementRecord } from '@/types';
 
 export function useExpenses(groupId: string) {
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -105,4 +105,32 @@ export function useSettlements(groupId: string) {
   useEffect(() => { load(); }, [load]);
 
   return { settlements, refetch: load };
+}
+
+/** Everything needed for my totals across all groups — no row limit, minimal columns. */
+type TotalsExpense = Pick<Expense, 'id' | 'group_id' | 'paid_by' | 'paid_by_pending'> & {
+  participants: Pick<ExpenseParticipant, 'user_id' | 'pending_member_id' | 'share_amount'>[];
+};
+
+export function useMyTotals() {
+  const [data, setData] = useState<{ expenses: TotalsExpense[]; payments: SettlementRecord[] }>({ expenses: [], payments: [] });
+  const [loading, setLoading] = useState(true);
+  const supabase = createClient();
+
+  useEffect(() => {
+    async function load() {
+      const [{ data: expenses }, { data: payments }] = await Promise.all([
+        supabase.from('expenses').select('id, group_id, paid_by, paid_by_pending, participants:expense_participants(user_id, pending_member_id, share_amount)'),
+        supabase.from('settlements').select('group_id, from_person, to_person, amount'),
+      ]);
+      setData({ expenses: (expenses || []) as unknown as TotalsExpense[], payments: (payments || []) as SettlementRecord[] });
+      setLoading(false);
+    }
+    load();
+    const onChange = () => load();
+    window.addEventListener('tripsplit:expenses-changed', onChange);
+    return () => window.removeEventListener('tripsplit:expenses-changed', onChange);
+  }, []);
+
+  return { ...data, loading };
 }
