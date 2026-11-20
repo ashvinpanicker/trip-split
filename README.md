@@ -86,6 +86,8 @@ supabase/one_link_invites.sql
 supabase/atomic_expenses.sql
 supabase/trust_and_admin.sql
 supabase/stats_items_receipts.sql
+supabase/pay_methods.sql
+supabase/group_types.sql
 ```
 
 Under **Authentication → URL Configuration**, set your site URL and add `https://YOUR-DOMAIN/api/auth/callback**` as a redirect URL. Enable Google under **Providers** if you want one-tap sign-in.
@@ -104,7 +106,7 @@ npm run dev                    # http://localhost:3000
 - Dashboard → **Workers & Pages → Create → Import a repository**
 - Build command: `npm test && npx opennextjs-cloudflare build`
 - Deploy command: `npx opennextjs-cloudflare deploy`
-- Build variables: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and optionally `NEXT_PUBLIC_SITE_URL` (your public URL, used for SEO canonicals)
+- Build variables: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and optionally `NEXT_PUBLIC_SITE_URL` (your public URL, used for SEO canonicals), `NEXT_PUBLIC_GOOGLE_CLIENT_ID` (keeps Google sign-in on your own domain), `NEXT_PUBLIC_GA_ID` and `NEXT_PUBLIC_CONTACT_EMAIL`
 
 Or from your machine: `npx wrangler login && npm run deploy`.
 
