@@ -13,8 +13,12 @@ export const AUTHOR = { name: 'Ashvin Panicker', url: 'https://ashvinpanicker.co
  * upi: a UPI ID (e.g. name@okaxis); coffee: full Buy Me a Coffee URL; lightning: Lightning address.
  */
 export const SUPPORT = {
-  upi: process.env.NEXT_PUBLIC_TIP_UPI || '',
+  upi: process.env.NEXT_PUBLIC_TIP_UPI || 'Ashiseverything@axl',
   coffee: process.env.NEXT_PUBLIC_TIP_COFFEE_URL || '',
   lightning: process.env.NEXT_PUBLIC_TIP_LIGHTNING || '',
+  btc: process.env.NEXT_PUBLIC_TIP_BTC || '',
+  usdt: process.env.NEXT_PUBLIC_TIP_USDT || '',
+  /** Network for the USDT address, e.g. "TRC-20" or "ERC-20". Shown so people don't send on the wrong chain. */
+  usdtNetwork: process.env.NEXT_PUBLIC_TIP_USDT_NETWORK || '',
 };
-export const hasSupport = Object.values(SUPPORT).some(Boolean);
+export const hasSupport = Boolean(SUPPORT.upi || SUPPORT.coffee || SUPPORT.lightning || SUPPORT.btc || SUPPORT.usdt);
