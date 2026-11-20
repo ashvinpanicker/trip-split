@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { Calendar, Check, UserPlus, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
-import { calculateEqualSplits, calculatePercentageSplits, CATEGORIES } from '@/lib/utils/balance';
+import { computeShares as computeSharesFor, validateSplit, CATEGORIES } from '@/lib/utils/balance';
 import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
@@ -145,40 +145,18 @@ export default function AddExpenseModal({
     return participants.filter((p) => p.included);
   }
 
-  function computeShares(): Record<string, number> {
-    const included = getIncluded();
-    const total = parseFloat(amount) || 0;
-    if (!total || !included.length) return {};
+  function splitEntries() {
+    return getIncluded().map((p) => ({ key: p.key, percentage: p.percentage, amount: p.amount }));
+  }
 
-    if (splitType === 'equal') {
-      return calculateEqualSplits(total, included.map((p) => p.key));
-    }
-    if (splitType === 'percentage') {
-      const pcts: Record<string, number> = {};
-      for (const p of included) pcts[p.key] = parseFloat(p.percentage) || 0;
-      return calculatePercentageSplits(total, pcts);
-    }
-    const shares: Record<string, number> = {};
-    for (const p of included) shares[p.key] = parseFloat(p.amount) || 0;
-    return shares;
+  function computeShares() {
+    return computeSharesFor(splitType, parseFloat(amount) || 0, splitEntries());
   }
 
   function validate(): string | null {
     if (!title.trim()) return 'Enter a title';
-    const amt = parseFloat(amount);
-    if (!amt || amt <= 0) return 'Enter a valid amount';
     if (!paidBy) return 'Select who paid';
-    const included = getIncluded();
-    if (!included.length) return 'Select at least one participant';
-    if (splitType === 'percentage') {
-      const total = included.reduce((s, p) => s + (parseFloat(p.percentage) || 0), 0);
-      if (Math.abs(total - 100) > 0.5) return `Percentages must add up to 100% (currently ${total.toFixed(1)}%)`;
-    }
-    if (splitType === 'fixed') {
-      const total = Object.values(computeShares()).reduce((s, v) => s + v, 0);
-      if (Math.abs(total - amt) > 0.01) return `Amounts must add up to ₹${amt.toFixed(2)} (currently ₹${total.toFixed(2)})`;
-    }
-    return null;
+    return validateSplit(splitType, parseFloat(amount) || 0, splitEntries());
   }
 
   async function addNewPerson() {
@@ -234,39 +212,22 @@ export default function AddExpenseModal({
         share_percentage: splitType === 'percentage' ? parseFloat(p.percentage) || null : null,
       }));
 
-      if (isEditing && expense) {
-        const { error: expErr } = await supabase
-          .from('expenses')
-          .update({ title, amount: parseFloat(amount), date, ...payerFields, category, split_type: splitType, notes: notes || null })
-          .eq('id', expense.id);
-        if (expErr) throw expErr;
-
-        await supabase.from('expense_participants').delete().eq('expense_id', expense.id);
-        const { error: partErr } = await supabase.from('expense_participants').insert(
-          participantsData.map((p) => ({ ...p, expense_id: expense.id }))
-        );
-        if (partErr) throw partErr;
-        toast('Expense updated');
-      } else {
-        const { data: { user } } = await supabase.auth.getUser();
-        const { data: expData, error: expErr } = await supabase
-          .from('expenses')
-          .insert({
-            group_id: selectedGroupId,
-            title, amount: parseFloat(amount), date,
-            ...payerFields, category, split_type: splitType,
-            notes: notes || null, created_by: user!.id,
-          })
-          .select('id')
-          .single();
-        if (expErr) throw expErr;
-
-        const { error: partErr } = await supabase.from('expense_participants').insert(
-          participantsData.map((p) => ({ ...p, expense_id: expData.id }))
-        );
-        if (partErr) throw partErr;
-        toast('Expense added');
-      }
+      // One atomic call: expense + split saved together, and the DB rejects splits that don't add up
+      const { error } = await supabase.rpc('save_expense', {
+        p_expense_id: isEditing && expense ? expense.id : null,
+        p_group_id: selectedGroupId,
+        p_title: title.trim(),
+        p_amount: parseFloat(amount),
+        p_date: date,
+        p_paid_by: payerFields.paid_by,
+        p_paid_by_pending: payerFields.paid_by_pending,
+        p_category: category,
+        p_split_type: splitType,
+        p_notes: notes || null,
+        p_participants: participantsData,
+      });
+      if (error) throw error;
+      toast(isEditing ? 'Expense updated' : 'Expense added');
 
       onSuccess?.();
       onClose();

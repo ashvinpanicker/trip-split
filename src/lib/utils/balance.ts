@@ -1,4 +1,4 @@
-import type { Balance, Expense, ExpenseParticipant, Settlement, SettlementRecord } from '@/types';
+import type { Balance, Expense, ExpenseParticipant, Settlement, SettlementRecord, SplitType } from '@/types';
 
 export interface BalancePerson {
   id: string;         // user_id or pending_member id
@@ -12,44 +12,44 @@ export function payerIdOf(e: Pick<Expense, 'paid_by' | 'paid_by_pending'>): stri
   return e.paid_by ?? e.paid_by_pending ?? null;
 }
 
+/** Rupees → integer paise. All money maths runs in paise to avoid float drift. */
+export const toPaise = (rupees: number | string) => Math.round(Number(rupees) * 100);
+const toRupees = (paise: number) => paise / 100;
+
 export function calculateGroupBalances(
   expenses: (Pick<Expense, 'paid_by' | 'paid_by_pending'> & { participants: Pick<ExpenseParticipant, 'user_id' | 'pending_member_id' | 'share_amount'>[] })[],
   persons: BalancePerson[],
   settlements: Pick<SettlementRecord, 'from_person' | 'to_person' | 'amount'>[] = []
 ): Balance[] {
-  const net: Record<string, number> = {};
+  const net: Record<string, number> = {}; // paise
   for (const p of persons) net[p.id] = 0;
+  const bump = (id: string, paise: number) => { net[id] = (net[id] || 0) + paise; };
 
   for (const expense of expenses) {
     const payerId = payerIdOf(expense);
     if (!payerId) continue;
-    if (!(payerId in net)) net[payerId] = 0;
-
     for (const participant of expense.participants) {
-      // Support both real users and pending members
+      // A claimed pending slot has both ids set; the real user wins
       const uid = participant.user_id ?? participant.pending_member_id;
-      if (!uid) continue;
-      if (!(uid in net)) net[uid] = 0;
-
-      if (uid !== payerId) {
-        net[payerId] += Number(participant.share_amount);
-        net[uid] -= Number(participant.share_amount);
-      }
+      if (!uid || uid === payerId) continue;
+      const share = toPaise(participant.share_amount);
+      bump(payerId, share);
+      bump(uid, -share);
     }
   }
 
   // Recorded payments: debtor paid creditor, so debtor's balance goes up
   for (const s of settlements) {
-    const amt = Number(s.amount);
-    net[s.from_person] = (net[s.from_person] || 0) + amt;
-    net[s.to_person] = (net[s.to_person] || 0) - amt;
+    const amt = toPaise(s.amount);
+    bump(s.from_person, amt);
+    bump(s.to_person, -amt);
   }
 
   return persons.map((p) => ({
     person_id: p.id,
     user_name: p.name,
     avatar_url: p.avatar_url ?? null,
-    net_balance: Math.round((net[p.id] || 0) * 100) / 100,
+    net_balance: toRupees(net[p.id] || 0),
     is_pending: p.is_pending,
   }));
 }
@@ -168,30 +168,71 @@ export function directDebts(
   return out.sort((x, y) => y.amount - x.amount);
 }
 
-export function calculateEqualSplits(
-  totalAmount: number,
-  keys: string[]
-): Record<string, number> {
+/** Equal split in whole paise; leftover paise go one each to the first people in the list. Always sums to the total. */
+export function calculateEqualSplits(totalAmount: number, keys: string[]): Record<string, number> {
   const n = keys.length;
   if (n === 0) return {};
-  const base = Math.floor((totalAmount * 100) / n) / 100;
-  const remainder = Math.round((totalAmount - base * n) * 100);
+  const total = toPaise(totalAmount);
+  const base = Math.floor(total / n);
+  const extra = total - base * n;
   const splits: Record<string, number> = {};
-  keys.forEach((k, idx) => {
-    splits[k] = base + (idx < remainder ? 0.01 : 0);
-  });
+  keys.forEach((k, i) => { splits[k] = toRupees(base + (i < extra ? 1 : 0)); });
   return splits;
 }
 
-export function calculatePercentageSplits(
-  totalAmount: number,
-  percentages: Record<string, number>
-): Record<string, number> {
-  const splits: Record<string, number> = {};
-  for (const [k, pct] of Object.entries(percentages)) {
-    splits[k] = Math.round(totalAmount * (pct / 100) * 100) / 100;
+/**
+ * Percentage split using largest-remainder rounding. Shares are proportional to the
+ * percentages and always sum exactly to the total (validateSplit makes sure they're ~100%).
+ */
+export function calculatePercentageSplits(totalAmount: number, percentages: Record<string, number>): Record<string, number> {
+  const total = toPaise(totalAmount);
+  const entries = Object.entries(percentages);
+  const pctSum = entries.reduce((s, [, p]) => s + p, 0);
+  if (!entries.length || pctSum <= 0) return Object.fromEntries(entries.map(([k]) => [k, 0]));
+  const target = total;
+  const raw = entries.map(([k, p]) => ({ k, exact: (total * p) / pctSum }));
+  const floors = raw.map((r) => ({ ...r, paise: Math.floor(r.exact + 1e-9) }));
+  let left = target - floors.reduce((s, r) => s + r.paise, 0);
+  [...floors]
+    .sort((a, b) => (b.exact - b.paise) - (a.exact - a.paise))
+    .forEach((r) => { if (left > 0) { r.paise += 1; left -= 1; } });
+  return Object.fromEntries(floors.map((r) => [r.k, toRupees(r.paise)]));
+}
+
+export type SplitEntry = { key: string; percentage?: string | number; amount?: string | number };
+
+/** Shares (in rupees) for the included people, by split type. */
+export function computeShares(splitType: SplitType, totalAmount: number, entries: SplitEntry[]): Record<string, number> {
+  if (splitType === 'equal') return calculateEqualSplits(totalAmount, entries.map((e) => e.key));
+  if (splitType === 'percentage') {
+    return calculatePercentageSplits(totalAmount, Object.fromEntries(entries.map((e) => [e.key, Number(e.percentage) || 0])));
   }
-  return splits;
+  return Object.fromEntries(entries.map((e) => [e.key, toRupees(toPaise(Number(e.amount) || 0))]));
+}
+
+/** Returns an error message, or null when the split adds up exactly. */
+export function validateSplit(splitType: SplitType, totalAmount: number, entries: SplitEntry[]): string | null {
+  const total = toPaise(totalAmount);
+  if (!(total > 0)) return 'Enter a valid amount';
+  if (!entries.length) return 'Select at least one participant';
+  if (splitType === 'percentage') {
+    const pct = entries.reduce((s, e) => s + (Number(e.percentage) || 0), 0);
+    if (entries.some((e) => (Number(e.percentage) || 0) < 0)) return 'Percentages can’t be negative';
+    // Percentages are stored to 2 decimals, so allow the rounding that brings back (e.g. 33.33 × 3)
+    if (Math.abs(pct - 100) > 0.005 * entries.length + 1e-9) return `Percentages must add up to 100% (currently ${+pct.toFixed(2)}%)`;
+  }
+  if (splitType === 'fixed') {
+    if (entries.some((e) => (Number(e.amount) || 0) < 0)) return 'Amounts can’t be negative';
+    const sum = entries.reduce((s, e) => s + toPaise(Number(e.amount) || 0), 0);
+    if (sum !== total) {
+      const diff = toRupees(total - sum);
+      return `Amounts must add up to ${formatCurrency(toRupees(total))} (${diff > 0 ? `${formatCurrency(diff)} left` : `${formatCurrency(-diff)} over`})`;
+    }
+  }
+  const shares = computeShares(splitType, totalAmount, entries);
+  const sum = Object.values(shares).reduce((s, v) => s + toPaise(v), 0);
+  if (sum !== total) return 'Split doesn’t add up — please check the amounts';
+  return null;
 }
 
 export function formatCurrency(amount: number): string {
