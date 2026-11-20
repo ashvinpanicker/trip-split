@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Plus, UserPlus, Users, Receipt } from 'lucide-react';
 import AppHeader from '@/components/layout/AppHeader';
 import Button from '@/components/ui/Button';
+import { groupColors } from '@/lib/utils/groupColor';
 import Card from '@/components/ui/Card';
 import EmptyState from '@/components/ui/EmptyState';
 import CreateGroupModal from '@/components/groups/CreateGroupModal';
@@ -14,6 +15,7 @@ import { useGroups } from '@/hooks/useGroups';
 export default function GroupsPage() {
   const router = useRouter();
   const { groups, loading, refetch } = useGroups();
+  const colors = groupColors(groups);
   const [showCreate, setShowCreate] = useState(false);
   const [showJoin, setShowJoin] = useState(false);
 
@@ -60,7 +62,10 @@ export default function GroupsPage() {
                 className="active:bg-gray-50"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-blue-600 rounded-2xl flex items-center justify-center text-white text-xl font-bold flex-shrink-0">
+                  <div
+                    className="w-12 h-12 rounded-2xl flex items-center justify-center text-xl font-bold flex-shrink-0"
+                    style={{ background: colors[group.id]?.bg, color: colors[group.id]?.fg }}
+                  >
                     {group.name[0].toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">

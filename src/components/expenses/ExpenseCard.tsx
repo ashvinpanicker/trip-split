@@ -10,6 +10,7 @@ import { formatCurrency, categoryOf, payerIdOf } from '@/lib/utils/balance';
 import type { Expense } from '@/types';
 import AddExpenseModal from './AddExpenseModal';
 import ReceiptPhoto from './ReceiptPhoto';
+import { groupColor, type GroupColor } from '@/lib/utils/groupColor';
 
 interface ExpenseCardProps {
   expense: Expense;
@@ -18,9 +19,12 @@ interface ExpenseCardProps {
   onUpdate?: () => void;
   /** Override the display currency (e.g. on the dashboard, where groups differ) */
   currency?: string;
+  /** Show which trip this is from (dashboard, when you're in several) */
+  group?: { id: string; name: string; color?: GroupColor };
 }
 
-export default function ExpenseCard({ expense, currentUserId, onDelete, onUpdate, currency }: ExpenseCardProps) {
+export default function ExpenseCard({ expense, currentUserId, onDelete, onUpdate, currency, group }: ExpenseCardProps) {
+  const gc = group ? group.color ?? groupColor(group.id) : null;
   const { toast } = useToast();
   const supabase = createClient();
   const [expanded, setExpanded] = useState(false);
@@ -75,7 +79,7 @@ export default function ExpenseCard({ expense, currentUserId, onDelete, onUpdate
 
   return (
     <>
-      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden" style={gc ? { borderLeft: `4px solid ${gc.dot}` } : undefined}>
         <div className="flex items-start gap-3 p-4">
           <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center flex-shrink-0">
             <span className="text-lg">{cat.emoji}</span>
@@ -83,6 +87,15 @@ export default function ExpenseCard({ expense, currentUserId, onDelete, onUpdate
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
+                {group && gc && (
+                  <span
+                    className="inline-flex max-w-[11rem] items-center gap-1 rounded-full px-2 py-0.5 mb-1 text-[11px] font-semibold"
+                    style={{ background: gc.bg, color: gc.fg }}
+                  >
+                    <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: gc.dot }} aria-hidden />
+                    <span className="truncate">{group.name}</span>
+                  </span>
+                )}
                 <p className="font-semibold text-gray-900 truncate">{expense.title}</p>
                 <p className="text-xs text-gray-500 mt-0.5">
                   {format(new Date(expense.date), 'MMM d')} · {payerName} paid

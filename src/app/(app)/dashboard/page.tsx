@@ -13,6 +13,7 @@ import { InstallPrompt } from '@/components/pwa/Pwa';
 import { useGroups } from '@/hooks/useGroups';
 import { useAllExpenses, useMyTotals } from '@/hooks/useExpenses';
 import { formatCurrency, myNetByGroup, totalsByCurrency } from '@/lib/utils/balance';
+import { groupColors } from '@/lib/utils/groupColor';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -24,6 +25,7 @@ export default function DashboardPage() {
   if (!user) return null;
 
   // Same maths as the group pages: per-group net (incl. recorded payments), summed per currency
+  const colors = groupColors(groups);
   const currencyOf = (gid: string) => groups.find((g) => g.id === gid)?.currency || 'INR';
   // Tracking-only trips (e.g. family) have no balances, so they stay out of owed/owe totals
   const settling = Object.fromEntries(Object.entries(myNetByGroup(user.id, totals.expenses, totals.payments)).filter(([gid]) => !groups.find((g) => g.id === gid)?.track_only));
@@ -87,7 +89,10 @@ export default function DashboardPage() {
                   onClick={() => router.push(`/groups/${g.id}`)}
                   className="flex flex-col items-center gap-1.5 flex-shrink-0"
                 >
-                  <div className="w-14 h-14 bg-blue-100 rounded-2xl flex items-center justify-center text-2xl shadow-sm">
+                  <div
+                    className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-semibold shadow-sm"
+                    style={{ background: colors[g.id]?.bg, color: colors[g.id]?.fg }}
+                  >
                     {g.name[0].toUpperCase()}
                   </div>
                   <span className="text-xs text-gray-700 font-medium w-14 text-center truncate">{g.name}</span>
@@ -120,6 +125,11 @@ export default function DashboardPage() {
                   expense={expense}
                   currentUserId={user.id}
                   currency={currencyOf(expense.group_id)}
+                  group={
+                    groups.length > 1 && groups.find((g) => g.id === expense.group_id)
+                      ? { id: expense.group_id, name: groups.find((g) => g.id === expense.group_id)!.name, color: colors[expense.group_id] }
+                      : undefined
+                  }
                 />
               ))}
             </div>
