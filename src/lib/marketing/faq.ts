@@ -34,10 +34,18 @@ export const faq: { q: string; a: string }[] = [
   },
   {
     q: 'Which currencies does TripSplit support?',
-    a: 'Right now TripSplit works in Indian rupees (₹). Multi-currency support is not available yet.',
+    a: 'Each trip can use its own currency symbol, like ₹, ฿, € or $. TripSplit doesn’t convert between currencies, so log a trip’s expenses in one currency.',
   },
   {
     q: 'Is my data private?',
     a: 'Only members of a group can see that group’s expenses. This is enforced in the database with row-level security, not just in the app. TripSplit has no ads and does not sell data.',
+  },
+  {
+    q: 'How do I sign in?',
+    a: 'Tap “Sign in with Google” and you’re in, or use an email and password. Friends you invite can join the same way from one link.',
+  },
+  {
+    q: 'What is TripSplit built with?',
+    a: 'Next.js and React for the app, Supabase (Postgres with row-level security) for data and sign-in, and Cloudflare for hosting. It was vibecoded by Ashvin Panicker with Claude, and the code is open on GitHub.',
   },
 ];

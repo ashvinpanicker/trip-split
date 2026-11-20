@@ -39,7 +39,7 @@ export default function SupportLinks({ className = '' }: { className?: string })
     <div className={className}>
       <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
         <span>
-          Built by <a href={AUTHOR.url} className="underline underline-offset-4" rel="noopener">{AUTHOR.name}</a>
+          Vibecoded by <a href={AUTHOR.url} className="underline underline-offset-4" rel="noopener">{AUTHOR.name}</a> with Claude
           {hasSupport && ' · Buy me a coffee ☕'}
         </span>
         {TIPS.map((t) => (

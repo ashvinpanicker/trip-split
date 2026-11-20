@@ -32,7 +32,7 @@
 .mk .prose ul, .mk .prose ol { margin: 0.75rem 0 0 1.25rem; display: grid; gap: 0.4rem; }
 .mk .prose ul { list-style: disc; }
 .mk .prose ol { list-style: decimal; }
-.mk .prose a { color: var(--blue); text-decoration: underline; text-underline-offset: 3px; }
+.mk .prose a:not(.btn) { color: var(--blue); text-decoration: underline; text-underline-offset: 3px; }
 .mk .prose strong { color: var(--ink); }
 
 /* Ruled ledger paper with a red margin line, like an account book */
@@ -78,3 +78,18 @@
 .mk details > summary { list-style: none; cursor: pointer; }
 .mk details > summary::-webkit-details-marker { display: none; }
 .mk details[open] .chev { transform: rotate(45deg); }
+
+/* Hero paper plane: flies by default, parks when motion is reduced */
+.mk .mk-plane-still { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .mk .mk-plane-fly { display: none; }
+  .mk .mk-plane-still { display: inline; }
+}
+
+/* Paper-plane cursor on mouse/trackpad devices; links and buttons keep the hand */
+@media (pointer: fine) {
+  .mk {
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M2 2 L26 12 L14 14 L12 26 Z' fill='white' stroke='%231a56db' stroke-width='2' stroke-linejoin='round'/%3E%3Cpath d='M14 14 L26 12' stroke='%23d93f3f' stroke-width='1.5'/%3E%3C/svg%3E") 2 2, auto;
+  }
+  .mk a, .mk button, .mk summary, .mk [role='button'] { cursor: pointer; }
+}

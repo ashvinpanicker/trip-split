@@ -59,15 +59,16 @@ export default function SplitwiseAlternative() {
           <li><strong>Smart settle-up.</strong> Finds the fewest payments that clear every balance. In our example Goa trip, that’s {demoSmart.length} payments instead of {demoDirect.length}.</li>
           <li><strong>Friends join from one link.</strong> Add people by name, share one link in WhatsApp, and each person taps their name to claim their expenses.</li>
           <li><strong>UPI built in.</strong> “Pay via UPI” opens your UPI app with the amount filled in. TripSplit never touches the money.</li>
+          <li><strong>Itemized bills, receipt photos and trip stats.</strong> Splitwise keeps these behind Pro. Here they’re free.</li>
           <li><strong>No install.</strong> Runs in any phone browser and can be added to the home screen.</li>
           <li><strong>Open source.</strong> MIT-licensed, with the money maths covered by automated tests. <a href={REPO_URL}>See the code</a>.</li>
         </ul>
 
         <h2>What TripSplit doesn’t do (yet)</h2>
         <p>
-          We’d rather you know up front. TripSplit currently works in Indian rupees only, has no receipt scanning, and
-          can’t import your Splitwise history. If you need several currencies on one trip today, Splitwise Pro or
-          Tricount may suit you better.
+          We’d rather you know up front. TripSplit doesn’t convert between currencies (each trip picks one symbol),
+          doesn’t read receipts automatically, and can’t import your Splitwise history. If you need several currencies
+          on one trip today, Splitwise Pro or Tricount may suit you better.
         </p>
 
         <h2>How to switch from Splitwise in five minutes</h2>

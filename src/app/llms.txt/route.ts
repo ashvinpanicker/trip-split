@@ -17,7 +17,9 @@ Key facts:
 - Settle-up: computes the minimum number of payments to clear all balances (exact for up to 14 people with a non-zero balance; near-minimal beyond).
 - Friends can be added by name before they sign up, then claim their name from one shared invite link.
 - Payments: one-tap UPI deep links (India). TripSplit never holds or moves money.
-- Currency: Indian rupees (INR) only, for now. No receipt scanning yet. No import from Splitwise yet.
+- Currency: one currency symbol per trip (₹, ฿, €, $ and more); no conversion. No import from Splitwise yet.
+- Also free: itemized bills (tax/tip spread proportionally), receipt photos, trip stats and charts, CSV export, offline viewing, activity log.
+- Sign-in: Google or email. Built with Next.js, Supabase and Cloudflare; vibecoded by Ashvin Panicker with Claude.
 
 ## Pages
 - [Home](${SITE_URL}/): overview, comparison with Splitwise's free plan, FAQ

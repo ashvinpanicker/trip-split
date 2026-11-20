@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import LedgerDemo from '@/components/marketing/LedgerDemo';
+import PaperPlane from '@/components/marketing/PaperPlane';
 import { faq } from '@/lib/marketing/faq';
 import { REPO_URL, SITE_URL, jsonLd } from '@/lib/marketing/site';
 
@@ -26,8 +27,10 @@ const compare: [string, string, string][] = [
   ['Fewest-payments settle-up', 'Yes, exact minimum', 'Yes'],
   ['Friends without an account', 'Yes, they claim their name later', 'Yes'],
   ['Open source', 'Yes, MIT licence', 'No'],
-  ['Multiple currencies', 'Not yet (₹ only)', 'Conversion is a Pro feature'],
-  ['Receipt scanning', 'No', 'Pro feature'],
+  ['Currency', 'Any symbol per trip (no conversion)', 'Conversion is a Pro feature'],
+  ['Itemized bills', 'Yes, with tax and tip spread fairly', 'Pro feature'],
+  ['Receipt photos', 'Yes, free', 'Pro feature (with scanning)'],
+  ['Trip stats and charts', 'Yes, free', 'Pro feature'],
 ];
 
 export default function Home() {
@@ -65,7 +68,9 @@ export default function Home() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(structured) }} />
 
       {/* Hero */}
-      <section className="wrap grid lg:grid-cols-[1.05fr_1fr] gap-12 lg:gap-16 items-center pt-8 pb-16 sm:pt-16 sm:pb-24">
+      <section className="relative isolate overflow-hidden">
+      <PaperPlane />
+      <div className="wrap grid lg:grid-cols-[1.05fr_1fr] gap-12 lg:gap-16 items-center pt-8 pb-16 sm:pt-16 sm:pb-24">
         <div>
           <h1 className="text-[2.6rem] leading-[1.03] sm:text-6xl font-extrabold tracking-[-0.035em] [font-stretch:92%]">
             Split the trip, not the friendship. Free, with no daily limit.
@@ -79,10 +84,11 @@ export default function Home() {
             <Link href="/splitwise-alternative" className="btn btn-quiet">Compare with Splitwise</Link>
           </div>
           <p className="mt-5 text-sm text-[var(--ink-soft)]">
-            Works in any phone browser. Your friends join from one WhatsApp link.
+            Sign in with Google in one tap. Works in any phone browser, and friends join from one WhatsApp link.
           </p>
         </div>
         <LedgerDemo />
+      </div>
       </section>
 
       {/* Why it's free */}

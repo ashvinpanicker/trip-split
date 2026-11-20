@@ -24,6 +24,9 @@ export default function Footer() {
           <a href={`${REPO_URL}/blob/main/LICENSE`} className="hover:text-[var(--blue)]" rel="noopener">MIT licence</a>
         </div>
       </div>
+      <p className="wrap pb-3 text-sm text-[var(--ink-soft)]">
+        Built on Next.js, Supabase and Cloudflare. Sign in with Google or email.
+      </p>
       <p className="wrap pb-10 text-xs text-[var(--ink-soft)]">
         Splitwise is a trademark of Splitwise, Inc. TripSplit is an independent open-source project and is not affiliated with Splitwise.
       </p>
