@@ -6,6 +6,7 @@ import { setActiveCurrency } from '@/lib/utils/balance';
 import BottomNav from '@/components/layout/BottomNav';
 import { ToastProvider } from '@/components/ui/Toast';
 import AddExpenseModal from '@/components/expenses/AddExpenseModal';
+import { OfflineBanner, ServiceWorker } from '@/components/pwa/Pwa';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [showAddExpense, setShowAddExpense] = useState(false);
@@ -17,7 +18,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <ToastProvider>
+      <ServiceWorker />
       <div className="flex flex-col min-h-screen bg-gray-50">
+        <OfflineBanner />
         <main className="flex-1 pb-20">
           {children}
         </main>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { createClient, getAuthUser } from '@/lib/supabase/client';
 import type { Expense, ExpenseParticipant, SettlementRecord } from '@/types';
 
 export function useExpenses(groupId: string) {
@@ -48,7 +48,7 @@ export function useAllExpenses() {
 
   useEffect(() => {
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getAuthUser(supabase);
       if (!user) { setLoading(false); return; }
 
       // Get all groups user belongs to

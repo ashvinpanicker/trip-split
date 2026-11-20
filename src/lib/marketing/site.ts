@@ -16,9 +16,9 @@ export const SUPPORT = {
   upi: process.env.NEXT_PUBLIC_TIP_UPI || 'Ashiseverything@axl',
   coffee: process.env.NEXT_PUBLIC_TIP_COFFEE_URL || '',
   lightning: process.env.NEXT_PUBLIC_TIP_LIGHTNING || '',
-  btc: process.env.NEXT_PUBLIC_TIP_BTC || '',
-  usdt: process.env.NEXT_PUBLIC_TIP_USDT || '',
-  /** Network for the USDT address, e.g. "TRC-20" or "ERC-20". Shown so people don't send on the wrong chain. */
-  usdtNetwork: process.env.NEXT_PUBLIC_TIP_USDT_NETWORK || '',
+  btc: process.env.NEXT_PUBLIC_TIP_BTC || 'bc1q22dqj78rulaa5trydang968k24dtp3r7ja09m0',
+  // USDT addresses, labelled by network so nobody sends on the wrong chain
+  usdtTrc20: process.env.NEXT_PUBLIC_TIP_USDT_TRC20 || 'TGCvUK8LawmTBmQxkrNBiJ5k7mor4h6jha',
+  usdtErc20: process.env.NEXT_PUBLIC_TIP_USDT_ERC20 || '0xc0026E08B2aD3e919CB5Fb968056cf9D168EE901',
 };
-export const hasSupport = Boolean(SUPPORT.upi || SUPPORT.coffee || SUPPORT.lightning || SUPPORT.btc || SUPPORT.usdt);
+export const hasSupport = Boolean(SUPPORT.upi || SUPPORT.coffee || SUPPORT.lightning || SUPPORT.btc || SUPPORT.usdtTrc20 || SUPPORT.usdtErc20);

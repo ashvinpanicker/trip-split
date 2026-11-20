@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { createClient, getAuthUser } from '@/lib/supabase/client';
 import type { Group } from '@/types';
 
 export function useGroups() {
@@ -11,7 +11,7 @@ export function useGroups() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getAuthUser(supabase);
     if (!user) { setLoading(false); return; }
 
     const { data } = await supabase

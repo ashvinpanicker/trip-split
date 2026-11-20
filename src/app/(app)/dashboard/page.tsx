@@ -9,6 +9,7 @@ import Card from '@/components/ui/Card';
 import EmptyState from '@/components/ui/EmptyState';
 import ExpenseCard from '@/components/expenses/ExpenseCard';
 import { useUser } from '@/hooks/useUser';
+import { InstallPrompt } from '@/components/pwa/Pwa';
 import { useGroups } from '@/hooks/useGroups';
 import { useAllExpenses, useMyTotals } from '@/hooks/useExpenses';
 import { formatCurrency, myNetByGroup, totalsByCurrency } from '@/lib/utils/balance';
@@ -37,6 +38,7 @@ export default function DashboardPage() {
         subtitle="Here's your summary"
         right={<Avatar src={user.avatar_url} name={user.full_name || user.email} size="sm" />}
       />
+      <InstallPrompt />
 
       <div className="p-4 space-y-4">
         {/* Balance summary */}

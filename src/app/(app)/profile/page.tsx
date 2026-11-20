@@ -1,5 +1,6 @@
 'use client';
 
+import { clearOfflineCache } from '@/components/pwa/Pwa';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { LogOut, User, Mail, Edit2, Check, IndianRupee } from 'lucide-react';
@@ -40,6 +41,7 @@ export default function ProfilePage() {
 
   async function handleSignOut() {
     await supabase.auth.signOut();
+    await clearOfflineCache();
     router.push('/login');
   }
 

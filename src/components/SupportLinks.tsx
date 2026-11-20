@@ -45,9 +45,8 @@ export default function SupportLinks({ className = '' }: { className?: string })
           {SUPPORT.coffee && <a href={SUPPORT.coffee} rel="noopener" className={pill}>☕ Buy me a coffee</a>}
           {SUPPORT.lightning && <a href={`lightning:${SUPPORT.lightning}`} className={pill} title={SUPPORT.lightning}>⚡ Tip in sats</a>}
           {SUPPORT.btc && <CopyButton label="₿ Copy BTC address" value={SUPPORT.btc} />}
-          {SUPPORT.usdt && (
-            <CopyButton label={`💵 Copy USDT address${SUPPORT.usdtNetwork ? ` (${SUPPORT.usdtNetwork})` : ''}`} value={SUPPORT.usdt} />
-          )}
+          {SUPPORT.usdtTrc20 && <CopyButton label="💵 Copy USDT (TRC-20)" value={SUPPORT.usdtTrc20} />}
+          {SUPPORT.usdtErc20 && <CopyButton label="💵 Copy USDT (ERC-20)" value={SUPPORT.usdtErc20} />}
         </div>
       )}
     </div>

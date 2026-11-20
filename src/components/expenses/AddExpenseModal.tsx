@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { Calendar, Check, UserPlus, X } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
+import { createClient, getAuthUser } from '@/lib/supabase/client';
 import { computeShares as computeSharesFor, validateSplit, itemizedShares, CATEGORIES, currencySymbol, formatCurrency, getActiveCurrency, shortName } from '@/lib/utils/balance';
 import ItemizedEditor, { type DraftBill } from './ItemizedEditor';
 import Modal from '@/components/ui/Modal';
@@ -75,7 +75,7 @@ export default function AddExpenseModal({
   useEffect(() => {
     if (!open) return;
     async function init() {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getAuthUser(supabase);
       if (!user) return;
       setCurrentUserId(user.id);
 
