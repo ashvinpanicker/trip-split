@@ -1,0 +1,78 @@
+@import '@fontsource-variable/bricolage-grotesque';
+
+.mk {
+  --paper: #f7f9fc;
+  --ink: #0f1e3d;
+  --ink-soft: #47557a;
+  --blue: #1a56db;
+  --blue-deep: #1440a8;
+  --rule: #dce6f5;
+  --margin: #d93f3f;
+  --gain: #12805c;
+  font-family: 'Bricolage Grotesque Variable', ui-sans-serif, system-ui, sans-serif;
+  font-optical-sizing: auto;
+  background: var(--paper);
+  color: var(--ink);
+  min-height: 100%;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+.mk a:focus-visible, .mk button:focus-visible, .mk summary:focus-visible {
+  outline: 3px solid var(--blue);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+.mk .num { font-variant-numeric: tabular-nums; }
+.mk .wrap { max-width: 68rem; margin: 0 auto; padding: 0 1.25rem; }
+.mk .prose { max-width: 40rem; }
+.mk .prose p, .mk .prose li { color: var(--ink-soft); font-size: 1.0625rem; }
+.mk .prose h2 { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.02em; margin: 2.5rem 0 0.75rem; color: var(--ink); line-height: 1.2; }
+.mk .prose h3 { font-size: 1.15rem; font-weight: 650; margin: 1.75rem 0 0.4rem; color: var(--ink); }
+.mk .prose p + p { margin-top: 0.9rem; }
+.mk .prose ul, .mk .prose ol { margin: 0.75rem 0 0 1.25rem; display: grid; gap: 0.4rem; }
+.mk .prose ul { list-style: disc; }
+.mk .prose ol { list-style: decimal; }
+.mk .prose a { color: var(--blue); text-decoration: underline; text-underline-offset: 3px; }
+.mk .prose strong { color: var(--ink); }
+
+/* Ruled ledger paper with a red margin line, like an account book */
+.mk .ledger {
+  background-color: #fff;
+  background-image:
+    linear-gradient(to right, transparent 2.6rem, var(--margin) 2.6rem, var(--margin) calc(2.6rem + 1.5px), transparent calc(2.6rem + 1.5px)),
+    repeating-linear-gradient(to bottom, transparent 0, transparent 2.35rem, var(--rule) 2.35rem, var(--rule) calc(2.35rem + 1px));
+  border: 1px solid var(--rule);
+  border-radius: 14px;
+  box-shadow: 0 1px 0 var(--rule), 0 18px 40px -24px rgba(15, 30, 61, 0.35);
+}
+.mk .ledger-row { height: 2.35rem; display: flex; align-items: center; padding: 0 1rem 0 3.4rem; gap: 0.75rem; }
+
+.mk .btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+  height: 3rem; padding: 0 1.4rem; border-radius: 999px; font-weight: 650; font-size: 1rem;
+  transition: background-color 0.15s, transform 0.15s;
+}
+.mk .btn-primary { background: var(--blue); color: #fff; }
+.mk .btn-primary:hover { background: var(--blue-deep); }
+.mk .btn-primary:active { transform: scale(0.98); }
+.mk .btn-quiet { color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--rule); background: #fff; }
+.mk .btn-quiet:hover { box-shadow: inset 0 0 0 1.5px var(--ink-soft); }
+
+/* The one orchestrated moment: direct payments get struck through, smart ones land */
+@keyframes mk-strike { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes mk-land { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.mk .strike { position: relative; }
+.mk .strike::after {
+  content: ''; position: absolute; left: 3.2rem; right: 0.8rem; top: 50%; height: 1.5px;
+  background: var(--margin); transform-origin: left; transform: scaleX(0);
+  animation: mk-strike 0.35s ease-out forwards; animation-delay: var(--d, 0s);
+}
+.mk .land { opacity: 0; animation: mk-land 0.4s ease-out forwards; animation-delay: var(--d, 0s); }
+@media (prefers-reduced-motion: reduce) {
+  .mk .strike::after { animation: none; transform: scaleX(1); }
+  .mk .land { animation: none; opacity: 1; }
+}
+
+.mk details > summary { list-style: none; cursor: pointer; }
+.mk details > summary::-webkit-details-marker { display: none; }
+.mk details[open] .chev { transform: rotate(45deg); }
