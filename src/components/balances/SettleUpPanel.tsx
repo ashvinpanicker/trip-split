@@ -1,5 +1,6 @@
 'use client';
 
+import type { PayMethod } from '@/lib/utils/payMethods';
 import { useMemo, useState } from 'react';
 import { ChevronDown, Share2 } from 'lucide-react';
 import Card from '@/components/ui/Card';
@@ -22,13 +23,13 @@ interface SettleUpPanelProps {
   currentUserId: string;
   groupId: string;
   groupName: string;
-  upiIds: Record<string, string | null | undefined>;
+  payMethods: Record<string, PayMethod[]>;
   onRecorded: () => void;
 }
 
 export default function SettleUpPanel({
   balances, byPerson, simplified, simplify, isAdmin, onToggleSimplify, onOpenPerson,
-  currentUserId, groupId, groupName, upiIds, onRecorded,
+  currentUserId, groupId, groupName, payMethods, onRecorded,
 }: SettleUpPanelProps) {
   const [showAll, setShowAll] = useState(false);
 
@@ -113,7 +114,7 @@ export default function SettleUpPanel({
           currentUserId={currentUserId}
           groupId={groupId}
           groupName={groupName}
-          upiIds={upiIds}
+          payMethods={payMethods}
           onRecorded={onRecorded}
           onOpenPerson={onOpenPerson}
           isRerouted={simplify ? (s) => !realPairs.has(`${s.from_id}>${s.to_id}`) : undefined}

@@ -1,6 +1,7 @@
 'use client';
 
 import { clearOfflineCache } from '@/components/pwa/Pwa';
+import PayMethodsEditor from '@/components/profile/PayMethodsEditor';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { LogOut, User, Mail, Edit2, Check, IndianRupee } from 'lucide-react';
@@ -22,23 +23,6 @@ export default function ProfilePage() {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState('');
   const [saving, setSaving] = useState(false);
-  const [upi, setUpi] = useState<string | null>(null);
-  const [savingUpi, setSavingUpi] = useState(false);
-
-  async function handleSaveUpi() {
-    if (!user || upi === null) return;
-    const value = upi.trim();
-    if (value && !/^[\w.\-]{2,256}@[a-zA-Z]{2,64}$/.test(value)) {
-      toast('That doesn\'t look like a UPI ID (e.g. name@okaxis)', 'error');
-      return;
-    }
-    setSavingUpi(true);
-    const { error } = await supabase.from('profiles').update({ upi_id: value || null }).eq('id', user.id);
-    setSavingUpi(false);
-    if (error) toast(error.message.includes('upi_id') ? 'Run supabase/goa_upgrade.sql first' : error.message, 'error');
-    else toast('UPI ID saved');
-  }
-
   async function handleSignOut() {
     await supabase.auth.signOut();
     await clearOfflineCache();
@@ -123,24 +107,7 @@ export default function ProfilePage() {
           </div>
         </Card>
 
-        <Card>
-          <div className="flex items-center gap-2 mb-1">
-            <IndianRupee size={16} className="text-blue-600" />
-            <p className="text-sm font-semibold text-gray-900">UPI ID</p>
-          </div>
-          <p className="text-xs text-gray-500 mb-3">Friends who owe you get a one-tap “Pay via UPI” button.</p>
-          <div className="flex gap-2">
-            <Input
-              placeholder="yourname@okaxis"
-              value={upi ?? user.upi_id ?? ''}
-              onChange={(e) => setUpi(e.target.value)}
-              autoCapitalize="none"
-              autoCorrect="off"
-              inputMode="email"
-            />
-            <Button loading={savingUpi} onClick={handleSaveUpi} disabled={upi === null}>Save</Button>
-          </div>
-        </Card>
+        <PayMethodsEditor userId={user.id} initial={(user as any).pay_methods} legacyUpi={user.upi_id} />
 
         <Button variant="danger" fullWidth onClick={handleSignOut}>
           <LogOut size={16} className="mr-2" /> Sign out

@@ -7,6 +7,7 @@ export interface Profile {
   full_name: string | null;
   avatar_url: string | null;
   upi_id?: string | null;
+  pay_methods?: unknown;
   created_at: string;
   updated_at: string;
 }

@@ -444,18 +444,6 @@ export function categoryOf(key?: string | null) {
   return CATEGORIES.find((c) => c.key === key) ?? CATEGORIES[CATEGORIES.length - 1];
 }
 
-/** UPI deep link — opens GPay/PhonePe/Paytm with payee + amount prefilled. */
-export function upiLink(upiId: string, name: string, amount: number, note: string) {
-  const params = new URLSearchParams({
-    pa: upiId.trim(),
-    pn: name,
-    am: amount.toFixed(2),
-    cu: 'INR',
-    tn: note.slice(0, 50),
-  });
-  return `upi://pay?${params.toString()}`;
-}
-
 /** Short label for chips: first name, or the full name when two people share a first name. */
 export function shortName(name: string, all: string[]): string {
   const first = (n: string) => n.trim().split(/\s+/)[0];

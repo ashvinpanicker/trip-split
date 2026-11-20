@@ -1,21 +1,22 @@
 'use client';
 
 import { useState } from 'react';
-import { ArrowRight, Check, Smartphone } from 'lucide-react';
+import { ArrowRight, Check, Copy, ExternalLink } from 'lucide-react';
 import Avatar from '@/components/ui/Avatar';
 import { useToast } from '@/components/ui/Toast';
 import { createClient } from '@/lib/supabase/client';
-import { formatCurrency, getActiveCurrency, upiLink } from '@/lib/utils/balance';
+import { formatCurrency, getActiveCurrency } from '@/lib/utils/balance';
+import { payActions, type PayMethod } from '@/lib/utils/payMethods';
 import type { Settlement } from '@/types';
 
 interface SettlementListProps {
   settlements: Settlement[];
   currentUserId: string;
-  /** When set, each row gets "Mark paid" (and UPI pay where possible). */
+  /** When set, each row gets "Mark paid" (and pay buttons where possible). */
   groupId?: string;
   groupName?: string;
-  /** person id → UPI ID */
-  upiIds?: Record<string, string | null | undefined>;
+  /** person id → ways they can be paid (UPI, PayPal, crypto…) */
+  payMethods?: Record<string, PayMethod[]>;
   onRecorded?: () => void;
   /** Open "You & X" for the other person on rows that involve you */
   onOpenPerson?: (personId: string) => void;
@@ -24,10 +25,19 @@ interface SettlementListProps {
 }
 
 export default function SettlementList({
-  settlements, currentUserId, groupId, groupName, upiIds = {}, onRecorded, onOpenPerson, isRerouted,
+  settlements, currentUserId, groupId, groupName, payMethods = {}, onRecorded, onOpenPerson, isRerouted,
 }: SettlementListProps) {
   const { toast } = useToast();
   const [savingIdx, setSavingIdx] = useState<number | null>(null);
+
+  async function copyAddress(label: string, value: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      toast(`Copied ${label} address. Check the network before sending.`);
+    } catch {
+      prompt(`Copy ${label} address:`, value);
+    }
+  }
 
   if (settlements.length === 0) {
     return (
@@ -66,8 +76,9 @@ export default function SettlementList({
       {settlements.map((s, i) => {
         const isYouPaying = s.from_id === currentUserId;
         const isYouReceiving = s.to_id === currentUserId;
-        // UPI only moves rupees
-        const receiverUpi = getActiveCurrency() === 'INR' ? upiIds[s.to_id] : null;
+        const actions = isYouPaying
+          ? payActions(payMethods[s.to_id] ?? [], s.amount, getActiveCurrency(), `${groupName ?? 'TripSplit'} settle-up`, s.to_name)
+          : [];
 
         return (
           <div
@@ -120,15 +131,35 @@ export default function SettlementList({
             )}
 
             {groupId && (isYouPaying || isYouReceiving) && (
-              <div className="flex gap-2 mt-3">
-                {isYouPaying && receiverUpi && (
-                  <a
-                    href={upiLink(receiverUpi, s.to_name, s.amount, `${groupName ?? 'TripSplit'} settle-up`)}
-                    className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-lg bg-blue-600 text-white text-sm font-medium active:bg-blue-700"
-                  >
-                    <Smartphone size={14} /> Pay via UPI
-                  </a>
+              <div className="mt-3 space-y-2">
+                {actions.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {actions.map((a, k) =>
+                      a.href ? (
+                        <a
+                          key={`${a.type}-${a.value}`}
+                          href={a.href}
+                          target={a.href.startsWith('https:') ? '_blank' : undefined}
+                          rel="noopener noreferrer"
+                          className={`flex-1 min-w-[7.5rem] flex items-center justify-center gap-1.5 h-9 rounded-lg text-sm font-medium ${
+                            k === 0 ? 'bg-blue-600 text-white active:bg-blue-700' : 'bg-white border border-blue-200 text-blue-700'
+                          }`}
+                        >
+                          Pay via {a.label} {a.href.startsWith('https:') && <ExternalLink size={12} />}
+                        </a>
+                      ) : (
+                        <button
+                          key={`${a.type}-${a.value}`}
+                          onClick={() => copyAddress(a.label, a.value)}
+                          className="flex-1 min-w-[7.5rem] flex items-center justify-center gap-1.5 h-9 rounded-lg bg-white border border-gray-200 text-gray-700 text-sm font-medium"
+                        >
+                          <Copy size={13} /> {a.label} address
+                        </button>
+                      ),
+                    )}
+                  </div>
                 )}
+              <div className="flex gap-2">
                 <button
                   onClick={() => markPaid(s, i)}
                   disabled={savingIdx !== null}
@@ -137,13 +168,14 @@ export default function SettlementList({
                   <Check size={14} /> {savingIdx === i ? 'Saving…' : isYouReceiving ? 'Got it' : 'Mark paid'}
                 </button>
               </div>
+              </div>
             )}
           </div>
         );
       })}
       {groupId && (
         <p className="text-xs text-gray-400 text-center">
-          Add your UPI ID in <a href="/profile" className="underline">Profile</a> so friends can pay you in one tap.
+          Add UPI, PayPal, Revolut, crypto and more in <a href="/profile" className="underline">Profile</a> so friends can pay you in one tap.
         </p>
       )}
     </div>

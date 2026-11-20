@@ -18,6 +18,7 @@ import TripStatsPanel from '@/components/stats/TripStatsPanel';
 import CurrencySelect from '@/components/groups/CurrencySelect';
 import { tripStats, filterExpenses } from '@/lib/utils/stats';
 import { expensesCsv } from '@/lib/utils/export';
+import { readPayMethods, type PayMethod } from '@/lib/utils/payMethods';
 import AddPeopleCard from '@/components/groups/AddPeopleCard';
 import InviteCard from '@/components/groups/InviteCard';
 import { useGroup } from '@/hooks/useGroups';
@@ -87,8 +88,8 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
   const nameOf = (pid: string) =>
     pid === user.id ? 'You' : allPersons.find((p) => p.id === pid)?.name ?? 'Someone';
 
-  const upiIds: Record<string, string | null> = {};
-  for (const m of group.members || []) upiIds[m.user_id] = (m.profile as any)?.upi_id ?? null;
+  const payMethods: Record<string, PayMethod[]> = {};
+  for (const m of group.members || []) payMethods[m.user_id] = readPayMethods((m.profile as any)?.pay_methods, (m.profile as any)?.upi_id);
 
   const expensesWithParts = expenses.filter((e) => e.participants) as (Expense & { participants: ExpenseParticipant[] })[];
   const balances = calculateGroupBalances(expensesWithParts, allPersons, payments);
@@ -323,7 +324,7 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
               currentUserId={user.id}
               groupId={id}
               groupName={group.name}
-              upiIds={upiIds}
+              payMethods={payMethods}
               onRecorded={() => { refetchPayments(); changed(); }}
             />
 
