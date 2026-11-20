@@ -446,10 +446,13 @@ export default function AddExpenseModal({
             </label>
             <button
               type="button"
-              onClick={() => setParticipants((prev) => prev.map((p) => ({ ...p, included: true })))}
-              className={`text-xs font-medium text-blue-600 ${participants.every((p) => p.included) ? 'invisible' : ''}`}
+              onClick={() => {
+                const all = participants.every((p) => p.included);
+                setParticipants((prev) => prev.map((p) => ({ ...p, included: !all })));
+              }}
+              className="text-xs font-medium text-blue-600"
             >
-              Select everyone
+              {participants.every((p) => p.included) ? 'Select none' : 'Select all'}
             </button>
           </div>
           <div className="space-y-2">
