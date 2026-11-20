@@ -36,5 +36,8 @@
     "typescript": "^5",
     "vitest": "^4.1.12",
     "wrangler": "^4.165.0"
-  }
+  },
+  "license": "MIT",
+  "description": "Free, open-source Splitwise alternative for splitting trip and group expenses",
+  "repository": "github:ashvinpanicker/trip-split"
 }
