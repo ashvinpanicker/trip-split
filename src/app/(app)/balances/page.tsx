@@ -22,7 +22,8 @@ export default function BalancesPage() {
 
   if (!user) return null;
 
-  const perGroup = myNetByGroup(user.id, totals.expenses, totals.payments);
+  // Tracking-only trips have no balances
+  const perGroup = Object.fromEntries(Object.entries(myNetByGroup(user.id, totals.expenses, totals.payments)).filter(([gid]) => !groups.find((g) => g.id === gid)?.track_only));
   const currencyOf = (gid: string) => groups.find((g) => g.id === gid)?.currency || 'INR';
   const byCurrency = Object.entries(totalsByCurrency(perGroup, currencyOf))
     .sort((a, b) => Number(b[0] === 'INR') - Number(a[0] === 'INR'));
@@ -66,7 +67,7 @@ export default function BalancesPage() {
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-gray-900 truncate">{g.name}</p>
                     <p className="text-xs text-gray-500">
-                      {net > 0 ? 'you get back' : net < 0 ? 'you owe' : 'settled up'}
+                      {g.track_only ? 'just tracking spending' : net > 0 ? 'you get back' : net < 0 ? 'you owe' : 'settled up'}
                     </p>
                   </div>
                   <span className={`text-sm font-bold tabular-nums ${net > 0 ? 'text-green-600' : net < 0 ? 'text-red-500' : 'text-gray-400'}`}>

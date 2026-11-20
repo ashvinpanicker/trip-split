@@ -19,6 +19,8 @@ import CurrencySelect from '@/components/groups/CurrencySelect';
 import { tripStats, filterExpenses } from '@/lib/utils/stats';
 import { expensesCsv } from '@/lib/utils/export';
 import { readPayMethods, type PayMethod } from '@/lib/utils/payMethods';
+import GroupKindPicker from '@/components/groups/GroupKindPicker';
+import type { GroupKind } from '@/lib/utils/groupKinds';
 import AddPeopleCard from '@/components/groups/AddPeopleCard';
 import InviteCard from '@/components/groups/InviteCard';
 import { useGroup } from '@/hooks/useGroups';
@@ -101,7 +103,20 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
   const adminCount = (group.members || []).filter((m: any) => m.role === 'admin').length;
 
   const stats = tripStats(expensesWithParts, allPersons);
+  // "Just track spending": no balances or settle-up (who paid is still saved)
+  const trackOnly = !!group.track_only;
+  const view = trackOnly && tab === 'balances' ? 'expenses' : tab;
+  const myPaid = stats.paidUpfront.find((p) => p.id === user.id)?.total ?? 0;
   const shown = filterExpenses(expenses, { query, category: catFilter, payer: payerFilter });
+
+  async function setGroupType(patch: { kind?: GroupKind; track_only?: boolean }) {
+    const { error } = await createClient().from('groups').update(patch).eq('id', id);
+    if (error) toast(error.message, 'error');
+    else {
+      if (patch.track_only !== undefined) toast(patch.track_only ? 'Now just tracking spending' : 'Splitting and settling up is on');
+      refetchGroup();
+    }
+  }
 
   async function setCurrency(code: string) {
     const { error } = await createClient().from('groups').update({ currency: code }).eq('id', id);
@@ -190,34 +205,49 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
             <p className="text-xs text-gray-500">Total Spent</p>
             <p className="font-bold text-gray-900 truncate">{formatCurrency(totalExpenses)}</p>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs text-gray-500">My Balance</p>
-            <p className={`font-bold truncate ${myBalance && myBalance.net_balance >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-              {myBalance ? (myBalance.net_balance >= 0 ? '+' : '') + formatCurrency(myBalance.net_balance) : '—'}
-            </p>
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs text-gray-500">My Share</p>
-            <p className="font-bold text-gray-900 truncate">{formatCurrency(myTotalShare)}</p>
-          </div>
+          {trackOnly ? (
+            <>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-gray-500">{stats.days > 1 ? 'Per day' : 'Expenses'}</p>
+                <p className="font-bold text-gray-900 truncate">{stats.days > 1 ? formatCurrency(stats.perDay) : stats.count}</p>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-gray-500">You paid</p>
+                <p className="font-bold text-gray-900 truncate">{formatCurrency(myPaid)}</p>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-gray-500">My Balance</p>
+                <p className={`font-bold truncate ${myBalance && myBalance.net_balance >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                  {myBalance ? (myBalance.net_balance >= 0 ? '+' : '') + formatCurrency(myBalance.net_balance) : '—'}
+                </p>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-gray-500">My Share</p>
+                <p className="font-bold text-gray-900 truncate">{formatCurrency(myTotalShare)}</p>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
       {/* Main views: a compact segmented switch */}
       <div className="bg-white border-b border-gray-100 px-4 py-2">
-        <div role="tablist" aria-label="Trip views" className="grid grid-cols-3 gap-1 rounded-xl bg-gray-100 p-1">
+        <div role="tablist" aria-label="Trip views" className={`grid ${trackOnly ? 'grid-cols-2' : 'grid-cols-3'} gap-1 rounded-xl bg-gray-100 p-1`}>
           {([
             { key: 'expenses', label: 'Expenses' },
-            { key: 'balances', label: 'Balances' },
+            ...(trackOnly ? [] : [{ key: 'balances', label: 'Balances' }]),
             { key: 'stats', label: 'Stats' },
-          ] as const).map(({ key, label }) => (
+          ] as { key: Tab; label: string }[]).map(({ key, label }) => (
             <button
               key={key}
               role="tab"
-              aria-selected={tab === key}
+              aria-selected={view === key}
               onClick={() => setTab(key)}
               className={`h-9 rounded-lg text-sm font-medium transition-colors ${
-                tab === key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                view === key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
               }`}
             >
               {label}
@@ -235,7 +265,7 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
 
       <div className="flex-1 p-4 space-y-3">
         {/* Expenses tab */}
-        {tab === 'expenses' && (
+        {view === 'expenses' && (
           expLoading ? (
             <div className="space-y-3">{[1,2,3].map((i) => <div key={i} className="h-20 bg-gray-100 rounded-2xl animate-pulse" />)}</div>
           ) : expenses.length === 0 ? (
@@ -308,10 +338,10 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
         )}
 
         {/* Stats tab */}
-        {tab === 'stats' && <TripStatsPanel stats={stats} me={user.id} />}
+        {view === 'stats' && <TripStatsPanel stats={stats} me={user.id} />}
 
         {/* Balances tab */}
-        {tab === 'balances' && (
+        {view === 'balances' && (
           <div className="space-y-4">
             <SettleUpPanel
               balances={balances}
@@ -353,18 +383,24 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
         )}
 
         {/* Activity tab */}
-        {tab === 'activity' && (
+        {view === 'activity' && (
           <ActivityFeed groupId={id} currentUserId={user.id} nameOf={(pid) => nameOf(pid)} />
         )}
 
         {/* Members tab */}
-        {tab === 'members' && (
+        {view === 'members' && (
           <div className="space-y-3">
             <InviteCard inviteCode={group.invite_code} groupName={group.name} />
             {isAdmin && (
               <Card>
                 <h3 className="font-semibold text-gray-900 mb-3">Group settings</h3>
-                <CurrencySelect id="group-currency" value={group.currency || 'INR'} onChange={setCurrency} />
+                <GroupKindPicker
+                  kind={(group.kind as GroupKind) || 'friends'}
+                  trackOnly={trackOnly}
+                  onKind={(k) => setGroupType({ kind: k })}
+                  onTrackOnly={(v) => v !== trackOnly && setGroupType({ track_only: v })}
+                />
+                <div className="mt-4"><CurrencySelect id="group-currency" value={group.currency || 'INR'} onChange={setCurrency} /></div>
                 <p className="text-xs text-gray-500 mt-3">
                   Admins can also make others admin below, and turn on simplified payments in Balances.
                 </p>

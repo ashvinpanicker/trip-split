@@ -32,6 +32,8 @@ export interface Group {
   invite_code: string;
   simplify_debts?: boolean;
   currency?: string;
+  kind?: string;
+  track_only?: boolean;
   created_at: string;
   updated_at: string;
   member_count?: number;

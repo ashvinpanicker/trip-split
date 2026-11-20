@@ -18,7 +18,7 @@ export function useGroups() {
       .from('group_members')
       .select(`
         group:groups (
-          id, name, description, created_by, invite_code, currency, created_at, updated_at,
+          id, name, description, created_by, invite_code, currency, kind, track_only, created_at, updated_at,
           member_count:group_members(count),
           expenses(count)
         )

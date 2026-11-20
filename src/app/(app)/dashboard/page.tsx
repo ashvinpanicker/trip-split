@@ -25,7 +25,9 @@ export default function DashboardPage() {
 
   // Same maths as the group pages: per-group net (incl. recorded payments), summed per currency
   const currencyOf = (gid: string) => groups.find((g) => g.id === gid)?.currency || 'INR';
-  const byCurrency = Object.entries(totalsByCurrency(myNetByGroup(user.id, totals.expenses, totals.payments), currencyOf))
+  // Tracking-only trips (e.g. family) have no balances, so they stay out of owed/owe totals
+  const settling = Object.fromEntries(Object.entries(myNetByGroup(user.id, totals.expenses, totals.payments)).filter(([gid]) => !groups.find((g) => g.id === gid)?.track_only));
+  const byCurrency = Object.entries(totalsByCurrency(settling, currencyOf))
     .sort((a, b) => Number(b[0] === 'INR') - Number(a[0] === 'INR'));
   const [mainCode, main] = byCurrency[0] ?? ['INR', { owed: 0, owe: 0, net: 0 }];
   const others = byCurrency.slice(1);
