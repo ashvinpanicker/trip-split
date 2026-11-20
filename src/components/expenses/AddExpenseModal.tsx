@@ -446,13 +446,10 @@ export default function AddExpenseModal({
             </label>
             <button
               type="button"
-              onClick={() => {
-                const all = participants.every((p) => p.included);
-                setParticipants((prev) => prev.map((p) => ({ ...p, included: !all })));
-              }}
-              className="text-xs font-medium text-blue-600"
+              onClick={() => setParticipants((prev) => prev.map((p) => ({ ...p, included: true })))}
+              className={`text-xs font-medium text-blue-600 ${participants.every((p) => p.included) ? 'invisible' : ''}`}
             >
-              {participants.every((p) => p.included) ? 'Select none' : 'Select all'}
+              Select everyone
             </button>
           </div>
           <div className="space-y-2">
@@ -546,7 +543,7 @@ export default function AddExpenseModal({
                 className="flex items-center gap-2 w-full p-2.5 rounded-xl border border-dashed border-gray-300 text-gray-500 text-sm hover:border-blue-400 hover:text-blue-600 transition-colors"
               >
                 <UserPlus size={14} />
-                Add person who hasn&apos;t joined yet
+                Add someone (no account needed)
               </button>
             )}
           </div>

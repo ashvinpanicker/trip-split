@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ArrowRight, Check, Copy, ExternalLink } from 'lucide-react';
+import { ArrowRight, Check, Copy, ExternalLink, MessageCircle } from 'lucide-react';
 import Avatar from '@/components/ui/Avatar';
 import { useToast } from '@/components/ui/Toast';
 import { createClient } from '@/lib/supabase/client';
@@ -120,6 +120,19 @@ export default function SettlementList({
 
             {groupId && !(isYouPaying || isYouReceiving) && (
               <div className="flex justify-end mt-1.5">
+                {isYouReceiving && (
+                  <a
+                    href={`https://wa.me/?text=${encodeURIComponent(
+                      `Hey ${s.from_name.split(' ')[0]}, quick nudge from ${groupName ?? 'our trip'}: you owe me ${formatCurrency(s.amount)}. ` +
+                        `The details and a pay button are here: ${typeof location !== 'undefined' ? location.origin : 'https://gotripsplit.app'}/groups/${groupId}`,
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-lg bg-white border border-green-200 text-green-700 text-sm font-medium"
+                  >
+                    <MessageCircle size={14} /> Remind
+                  </a>
+                )}
                 <button
                   onClick={() => markPaid(s, i)}
                   disabled={savingIdx !== null}
@@ -160,6 +173,19 @@ export default function SettlementList({
                   </div>
                 )}
               <div className="flex gap-2">
+                {isYouReceiving && (
+                  <a
+                    href={`https://wa.me/?text=${encodeURIComponent(
+                      `Hey ${s.from_name.split(' ')[0]}, quick nudge from ${groupName ?? 'our trip'}: you owe me ${formatCurrency(s.amount)}. ` +
+                        `The details and a pay button are here: ${typeof location !== 'undefined' ? location.origin : 'https://gotripsplit.app'}/groups/${groupId}`,
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-lg bg-white border border-green-200 text-green-700 text-sm font-medium"
+                  >
+                    <MessageCircle size={14} /> Remind
+                  </a>
+                )}
                 <button
                   onClick={() => markPaid(s, i)}
                   disabled={savingIdx !== null}

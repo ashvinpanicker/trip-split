@@ -43,7 +43,7 @@ export default function AddPeopleCard({ groupId, existingNames, onAdded }: AddPe
     <Card>
       <p className="text-sm font-semibold text-gray-900">Add people by name</p>
       <p className="text-xs text-gray-500 mb-3">
-        They&apos;ll show up in splits right away, and pick their name when they open the group link.
+        No account needed. They show up in splits right away. If they open the invite link later and tap their name, everything already logged is theirs.
       </p>
       <form onSubmit={add} className="flex gap-2">
         <input

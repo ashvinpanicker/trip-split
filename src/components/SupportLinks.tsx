@@ -6,8 +6,7 @@ import { AUTHOR, SUPPORT, hasSupport } from '@/lib/marketing/site';
 const TIPS = [
   { icon: '₹', label: 'UPI ID', value: SUPPORT.upi },
   { icon: '₿', label: 'BTC address', value: SUPPORT.btc },
-  { icon: '₮', sub: 'T', label: 'USDT (TRC-20) address', value: SUPPORT.usdtTrc20 },
-  { icon: '₮', sub: 'E', label: 'USDT (ERC-20) address', value: SUPPORT.usdtErc20 },
+  { icon: '₮', label: 'USDT (TRC-20) address', value: SUPPORT.usdtTrc20 },
 ].filter((t) => t.value);
 
 /** "Built by" signature plus tiny tip icons that copy an address. */
@@ -53,7 +52,6 @@ export default function SupportLinks({ className = '' }: { className?: string })
             className="relative inline-flex h-6 w-6 items-center justify-center rounded-full border border-current/25 text-xs font-semibold leading-none opacity-80 hover:opacity-100"
           >
             {t.icon}
-            {t.sub && <span className="absolute -bottom-0.5 -right-0.5 text-[8px] font-bold">{t.sub}</span>}
           </button>
         ))}
         {copied && <span role="status" className="text-xs opacity-80 break-all select-all">{copied}</span>}
