@@ -138,7 +138,7 @@ export function DailyStacked({ stats }: { stats: TripStats }) {
       <svg width={W} height={H} className="block" role="img" aria-label="Spending per day by category">
         {y.ticks(3).map((t) => (
           <g key={t}>
-            <line x1={m.l} x2={W - m.r} y1={y(t)} y2={y(t)} stroke="#eceae4" />
+            <line x1={m.l} x2={plotR} y1={y(t)} y2={y(t)} stroke="#eceae4" />
             <text x={m.l - 6} y={y(t)} dy="0.32em" textAnchor="end" className="fill-gray-400 text-[10px] tabular-nums">{compact(t)}</text>
           </g>
         ))}
@@ -173,8 +173,8 @@ export function DailyStacked({ stats }: { stats: TripStats }) {
           );
         })}
         {/* Daily average */}
-        <line x1={m.l} x2={W - m.r} y1={y(avg)} y2={y(avg)} stroke="#52514e" strokeDasharray="3 3" />
-        <text x={W - m.r} y={y(avg) - 4} textAnchor="end" className="fill-gray-500 text-[10px]">avg {compact(avg)}</text>
+        <line x1={m.l} x2={plotR} y1={y(avg)} y2={y(avg)} stroke="#52514e" strokeDasharray="3 3" />
+        <text x={plotR} y={y(avg) - 4} textAnchor="end" className="fill-gray-500 text-[10px]">avg {compact(avg)}</text>
       </svg>
     </div>
   );
