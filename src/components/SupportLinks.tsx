@@ -39,7 +39,8 @@ export default function SupportLinks({ className = '' }: { className?: string })
     <div className={className}>
       <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
         <span>
-          Built with <span aria-label="love" className="text-red-500">♥</span> by <a href={AUTHOR.url} className="underline underline-offset-4" rel="noopener">{AUTHOR.name}</a>
+          Made with <span role="img" aria-label="love" className="text-[#b54141]">♥</span> by{' '}
+          <a href={AUTHOR.url} className="font-semibold underline decoration-dotted underline-offset-4" rel="noopener">ashvinpanicker</a>
           {hasSupport && ' · Buy me a coffee ☕'}
         </span>
         {TIPS.map((t) => (
