@@ -1,14 +1,18 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
-const MARKETING_PATHS = ['/', '/splitwise-alternative', '/how-to-split-trip-expenses', '/sitemap.xml', '/robots.txt', '/llms.txt'];
+const MARKETING_PATHS = ['/', '/splitwise-alternative', '/how-to-split-trip-expenses', '/sitemap.xml', '/robots.txt', '/llms.txt', '/sw.js', '/offline.html'];
+// Everything under these is public content (guides, blog)
+const MARKETING_PREFIXES = ['/guides', '/blog'];
+const isMarketing = (p: string) =>
+  MARKETING_PATHS.includes(p) || MARKETING_PREFIXES.some((x) => p === x || p.startsWith(`${x}/`));
 
 export async function updateSession(request: NextRequest) {
   // Public pages skip the Supabase round-trip entirely (fast TTFB for search engines).
   // "/" still checks signed-in visitors so they land on their dashboard.
   const path = request.nextUrl.pathname;
   const hasSession = request.cookies.getAll().some((c) => c.name.startsWith('sb-'));
-  if (MARKETING_PATHS.includes(path) && (path !== '/' || !hasSession)) {
+  if (isMarketing(path) && (path !== '/' || !hasSession)) {
     return NextResponse.next({ request });
   }
 
@@ -46,7 +50,7 @@ export async function updateSession(request: NextRequest) {
   // Invite links and the OAuth callback must work while logged out
   const publicPaths = ['/join', '/api/auth'];
   // Marketing pages are public; logged-in visitors to "/" go straight to their dashboard
-  const isPublicPath = publicPaths.some((p) => pathname.startsWith(p)) || MARKETING_PATHS.includes(pathname);
+  const isPublicPath = publicPaths.some((p) => pathname.startsWith(p)) || isMarketing(pathname);
 
   if (user && pathname === '/') {
     const url = request.nextUrl.clone();

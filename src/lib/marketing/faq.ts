@@ -25,8 +25,8 @@ export const faq: { q: string; a: string }[] = [
     a: 'It adds up what each person paid and what each person’s share was, so everyone ends with one balance. Then it finds the smallest number of payments that clears every balance, including spotting people whose balances cancel each other out. All maths is done in whole paise, so totals always add up exactly.',
   },
   {
-    q: 'Can I pay friends with UPI from TripSplit?',
-    a: 'Yes. If your friend adds their UPI ID in their profile, you get a “Pay via UPI” button that opens GPay, PhonePe or Paytm with the amount filled in. The money goes directly between you; TripSplit never holds or moves money. Then tap “Mark paid” to update the balances.',
+    q: 'How do I pay friends back: UPI, PayPal, Venmo, Revolut or crypto?',
+    a: 'Each person adds the ways they can be paid in their profile: UPI, PayPal, Cash App, Venmo, Revolut, Monzo, Wise, Bitcoin, Lightning, USDT, ETH or any payment link. When you owe them, TripSplit shows a button that opens that app with the amount filled in where the app allows it, or copies the address for crypto. The money goes directly between you; TripSplit never holds or moves money. Then tap “Mark paid”.',
   },
   {
     q: 'Can I split unequally, by percentage or exact amounts?',

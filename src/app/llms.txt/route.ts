@@ -1,4 +1,5 @@
 import { SITE_URL, REPO_URL } from '@/lib/marketing/site';
+import { ARTICLES } from '@/lib/marketing/articles';
 import { faq } from '@/lib/marketing/faq';
 
 export const dynamic = 'force-static';
@@ -16,15 +17,14 @@ Key facts:
 - Splits: equal, percentage, or exact amounts. Splits must add up to the total exactly (enforced in the database).
 - Settle-up: computes the minimum number of payments to clear all balances (exact for up to 14 people with a non-zero balance; near-minimal beyond).
 - Friends can be added by name before they sign up, then claim their name from one shared invite link.
-- Payments: one-tap UPI deep links (India). TripSplit never holds or moves money.
+- Payments: each person lists how they can be paid (UPI, PayPal, Cash App, Venmo, Revolut, Monzo, Wise, Bitcoin/Lightning, USDT, ETH or a link); the app opens that app with the amount filled in where supported. TripSplit never holds or moves money.
 - Currency: one currency symbol per trip (₹, ฿, €, $ and more); no conversion. No import from Splitwise yet.
 - Also free: itemized bills (tax/tip spread proportionally), receipt photos, trip stats and charts, CSV export, offline viewing, activity log.
 - Sign-in: Google or email. Built with Next.js, Supabase and Cloudflare; built by Ashvin Panicker.
 
 ## Pages
 - [Home](${SITE_URL}/): overview, comparison with Splitwise's free plan, FAQ
-- [Free Splitwise alternative](${SITE_URL}/splitwise-alternative): why people switch and how
-- [How to split trip expenses](${SITE_URL}/how-to-split-trip-expenses): step-by-step guide with a worked example
+${ARTICLES.map((a) => `- [${a.title}](${SITE_URL}${a.path}): ${a.description}`).join('\n')}
 - [Create a free account](${SITE_URL}/register)
 
 ## FAQ

@@ -21,7 +21,7 @@ const steps = [
   ['Make one shared list', 'Create a TripSplit group and add everyone by name. Share the group link so each person can log what they pay.'],
   ['Log each expense when it happens', 'Record who paid, the amount, and who it was for. Leave out the person who skipped the parasailing.'],
   ['Use the right split', 'Equal for most things. Percentage or exact amounts for uneven rooms, or for couples paying as one.'],
-  ['Settle up at the end, in as few payments as possible', 'Net everyone’s balance, then pay along the shortest plan. TripSplit works this out and opens UPI for each payment.'],
+  ['Settle up at the end, in as few payments as possible', 'Net everyone’s balance, then pay along the shortest plan. TripSplit works this out and opens each person’s payment app: UPI, PayPal, Revolut and more.'],
 ];
 
 export default function Guide() {

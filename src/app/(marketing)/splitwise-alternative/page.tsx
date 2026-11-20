@@ -58,7 +58,7 @@ export default function SplitwiseAlternative() {
           <li><strong>Equal, percentage or exact splits.</strong> A split can’t be saved unless it adds up to the total, to the paisa.</li>
           <li><strong>Smart settle-up.</strong> Finds the fewest payments that clear every balance. In our example Goa trip, that’s {demoSmart.length} payments instead of {demoDirect.length}.</li>
           <li><strong>Friends join from one link.</strong> Add people by name, share one link in WhatsApp, and each person taps their name to claim their expenses.</li>
-          <li><strong>UPI built in.</strong> “Pay via UPI” opens your UPI app with the amount filled in. TripSplit never touches the money.</li>
+          <li><strong>Pay buttons for any app.</strong> UPI, PayPal, Revolut, Wise, Venmo, Cash App, Monzo or crypto, with the amount filled in where the app allows. TripSplit never touches the money.</li>
           <li><strong>Itemized bills, receipt photos and trip stats.</strong> Splitwise keeps these behind Pro. Here they’re free.</li>
           <li><strong>No install.</strong> Runs in any phone browser and can be added to the home screen.</li>
           <li><strong>Open source.</strong> MIT-licensed, with the money maths covered by automated tests. <a href={REPO_URL}>See the code</a>.</li>

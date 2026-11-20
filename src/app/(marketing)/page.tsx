@@ -17,7 +17,7 @@ const steps = [
   { title: 'Add friends by name', body: 'Type everyone’s names in one go. They don’t need an account yet.' },
   { title: 'Drop one link in WhatsApp', body: 'Friends open it, tap their name and they’re in, along with everything already logged for them.' },
   { title: 'Log expenses as you go', body: 'Whoever pays adds it: equal, percentage or exact split, any number per day.' },
-  { title: 'Settle up in a few payments', body: 'TripSplit shows the fewest payments that clear everyone, with one-tap UPI.' },
+  { title: 'Settle up in a few payments', body: 'TripSplit shows the fewest payments that clear everyone, with one-tap UPI, PayPal, Revolut, Venmo and more.' },
 ];
 
 const compare: [string, string, string][] = [
@@ -29,6 +29,8 @@ const compare: [string, string, string][] = [
   ['Open source', 'Yes, MIT licence', 'No'],
   ['Currency', 'Any symbol per trip (no conversion)', 'Conversion is a Pro feature'],
   ['Itemized bills', 'Yes, with tax and tip spread fairly', 'Pro feature'],
+  ['Group admins', 'Yes, plus a full edit history', 'No admins; anyone can edit'],
+  ['Pay buttons', 'UPI, PayPal, Revolut, Wise, Venmo, crypto…', 'Varies by country'],
   ['Receipt photos', 'Yes, free', 'Pro feature (with scanning)'],
   ['Trip stats and charts', 'Yes, free', 'Pro feature'],
 ];
@@ -52,7 +54,9 @@ export default function Home() {
         'Equal, percentage and exact splits',
         'Smart settle-up with the fewest payments',
         'Add friends before they sign up',
-        'One-tap UPI payments',
+        'Pay buttons for UPI, PayPal, Revolut, Wise, Venmo, Cash App and crypto',
+        'Itemized bills, receipt photos, trip stats and charts',
+        'Works offline',
         'Works in any phone browser',
       ],
     },
@@ -113,6 +117,29 @@ export default function Home() {
               </p>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Seasonal: holiday trips */}
+      <section className="wrap pt-16" aria-labelledby="holiday">
+        <div className="rounded-3xl bg-[var(--ink)] text-white p-8 sm:p-10 grid gap-8 md:grid-cols-[1fr_1.2fr] items-center">
+          <div>
+            <h2 id="holiday" className="text-3xl sm:text-4xl font-bold tracking-tight leading-tight">Travelling with friends this holiday season?</h2>
+            <p className="mt-3 text-white/75">Short, practical guides for the trips people actually take in December.</p>
+          </div>
+          <ul className="grid gap-3">
+            {[
+              ['/guides/split-holiday-trip-expenses', 'How to split holiday trip costs with friends'],
+              ['/guides/split-restaurant-bill-by-item', 'Splitting a dinner bill when everyone ordered different things'],
+              ['/guides/pay-friends-back-abroad', 'Paying friends back when your group lives in different countries'],
+            ].map(([href, label]) => (
+              <li key={href}>
+                <Link href={href} className="flex items-center justify-between gap-4 rounded-2xl bg-white/10 hover:bg-white/15 px-5 py-4 font-medium">
+                  {label} <span aria-hidden>›</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 
