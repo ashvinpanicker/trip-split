@@ -42,6 +42,7 @@ export default function ExpenseCard({ expense, currentUserId, onDelete, onUpdate
   async function handleDelete() {
     if (!confirm('Delete this expense?')) return;
     setDeleting(true);
+    if (expense.receipt_path) await supabase.storage.from('receipts').remove([expense.receipt_path]);
     const { error } = await supabase.from('expenses').delete().eq('id', expense.id);
     if (error) {
       toast('Failed to delete expense', 'error');

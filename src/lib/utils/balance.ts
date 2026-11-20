@@ -455,3 +455,10 @@ export function upiLink(upiId: string, name: string, amount: number, note: strin
   });
   return `upi://pay?${params.toString()}`;
 }
+
+/** Short label for chips: first name, or the full name when two people share a first name. */
+export function shortName(name: string, all: string[]): string {
+  const first = (n: string) => n.trim().split(/\s+/)[0];
+  const f = first(name);
+  return all.filter((n) => first(n) === f).length > 1 ? name.trim() : f;
+}

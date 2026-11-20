@@ -38,6 +38,12 @@ TripSplit does the job for free, for good: open source, no premium tier, nothing
 - **Smart settle-up.** The fewest payments that clear every balance (exact for groups of up to 14 people with a balance), or switch to "Direct" to pay back exactly who paid for you.
 - **Splits that always add up.** Equal, percentage or exact amounts. A split that's off by even 1 paisa can't be saved, and the database enforces it too.
 - **Friends join from one link.** Add people by name, start logging, then drop one link in WhatsApp. Each person taps their name and inherits everything already logged for them.
+- **Itemized bills.** Enter what each person ordered; tax, service and tip are spread in proportion.
+- **Trip stats.** Where the money went, spend by day, who paid upfront, and fun awards (Chief Beer Officer, anyone?).
+- **Search and filters** by text, category or payer, plus **CSV export** for spreadsheets.
+- **Receipt photos** on any expense, compressed on your phone and visible only to the group.
+- **Any currency symbol** per trip (₹, ฿, €, $…). No conversion, just the right symbol.
+- **Admins and an activity log.** Admins control settings and can promote others; every add, edit and delete is logged.
 - **One-tap UPI.** "Pay via UPI" opens GPay / PhonePe / Paytm with the amount filled in. TripSplit never touches money.
 - **No install.** Mobile-first web app, add it to your home screen.
 - **Private by default.** Row-level security means only group members can read a group.
@@ -53,7 +59,7 @@ The maths is the whole point, so it's isolated in one module ([`src/lib/utils/ba
 - **Atomic saves.** An expense and its split are written in one database transaction ([`save_expense`](supabase/atomic_expenses.sql)), which rejects any split that doesn't match the amount.
 
 ```bash
-npm test   # 34 tests, thousands of randomised cases
+npm test   # 50 tests, thousands of randomised cases
 ```
 
 The tests check that splits always sum to the total, that balances always sum to zero, that the smart plan clears everyone to the paisa, and that it matches an independent brute-force minimum. Cloudflare runs them before every deploy, so broken maths can't ship.
@@ -78,6 +84,8 @@ supabase/add_pending_members.sql
 supabase/goa_upgrade.sql
 supabase/one_link_invites.sql
 supabase/atomic_expenses.sql
+supabase/trust_and_admin.sql
+supabase/stats_items_receipts.sql
 ```
 
 Under **Authentication → URL Configuration**, set your site URL and add `https://YOUR-DOMAIN/api/auth/callback**` as a redirect URL. Enable Google under **Providers** if you want one-tap sign-in.

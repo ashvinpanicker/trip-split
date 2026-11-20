@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { Calendar, Check, UserPlus, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
-import { computeShares as computeSharesFor, validateSplit, itemizedShares, CATEGORIES, currencySymbol, formatCurrency, getActiveCurrency } from '@/lib/utils/balance';
+import { computeShares as computeSharesFor, validateSplit, itemizedShares, CATEGORIES, currencySymbol, formatCurrency, getActiveCurrency, shortName } from '@/lib/utils/balance';
 import ItemizedEditor, { type DraftBill } from './ItemizedEditor';
 import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
@@ -385,7 +385,7 @@ export default function AddExpenseModal({
                 }`}
               >
                 <Avatar src={m.avatar_url} name={m.name} size="xs" />
-                {m.id === currentUserId ? 'You' : m.name.split(' ')[0]}
+                {m.id === currentUserId ? 'You' : shortName(m.name, participants.map((x) => x.name))}
               </button>
             ))}
           </div>

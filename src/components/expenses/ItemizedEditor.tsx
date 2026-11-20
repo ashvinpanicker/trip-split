@@ -1,7 +1,7 @@
 'use client';
 
 import { Plus, X } from 'lucide-react';
-import { formatCurrency, itemizedShares } from '@/lib/utils/balance';
+import { formatCurrency, itemizedShares, shortName } from '@/lib/utils/balance';
 
 export type DraftItem = { name: string; price: string; people: string[] };
 export type DraftBill = { items: DraftItem[]; extra: string };
@@ -29,7 +29,8 @@ export default function ItemizedEditor({ people, bill, onChange, currency, symbo
     bill.items.map((it) => ({ name: it.name, price: parseFloat(it.price) || 0, people: it.people })),
     parseFloat(bill.extra) || 0
   );
-  const first = (n: string) => n.split(' ')[0];
+  const names = people.map((p) => p.name);
+  const first = (n: string) => shortName(n, names);
 
   return (
     <div className="space-y-3">
