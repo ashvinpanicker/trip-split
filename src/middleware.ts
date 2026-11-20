@@ -1,7 +1,15 @@
-import { type NextRequest } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import { updateSession } from '@/lib/supabase/middleware';
 
 export async function middleware(request: NextRequest) {
+  // One canonical host: www.gotripsplit.app → gotripsplit.app
+  if (request.headers.get('host') === 'www.gotripsplit.app') {
+    const url = request.nextUrl.clone();
+    url.protocol = 'https';
+    url.host = 'gotripsplit.app';
+    url.port = '';
+    return NextResponse.redirect(url, 308);
+  }
   return await updateSession(request);
 }
 

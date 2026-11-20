@@ -5,7 +5,7 @@
 **Split the trip, not the friendship.**
 The free, open-source Splitwise alternative: no daily expense limit, no ads, no Pro plan.
 
-[**Try it →**](https://trip-split.tailgrab.workers.dev) &nbsp;·&nbsp; [Why not Splitwise?](https://trip-split.tailgrab.workers.dev/splitwise-alternative) &nbsp;·&nbsp; [Self-host](#self-host-in-10-minutes)
+[**Try it →**](https://gotripsplit.app) &nbsp;·&nbsp; [Why not Splitwise?](https://gotripsplit.app/splitwise-alternative) &nbsp;·&nbsp; [Self-host](#self-host-in-10-minutes)
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-1a56db.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/money%20maths-tested-12805c.svg)](src/lib/utils/balance.test.ts)
@@ -120,7 +120,7 @@ src/
 supabase/               schema + migrations (run in order above)
 ```
 
-The public site ships `sitemap.xml`, `robots.txt` (private routes excluded), [`llms.txt`](https://trip-split.tailgrab.workers.dev/llms.txt) for AI assistants, and schema.org data (WebApplication, FAQPage, HowTo, Article).
+The public site ships `sitemap.xml`, `robots.txt` (private routes excluded), [`llms.txt`](https://gotripsplit.app/llms.txt) for AI assistants, and schema.org data (WebApplication, FAQPage, HowTo, Article).
 
 ## Roadmap
 
