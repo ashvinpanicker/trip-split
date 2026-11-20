@@ -38,7 +38,7 @@ export const faq: { q: string; a: string }[] = [
   },
   {
     q: 'Is my data private?',
-    a: 'Only members of a group can see that group’s expenses. This is enforced in the database with row-level security, not just in the app. TripSplit has no ads and does not sell data.',
+    a: 'Only members of a group can see that group’s expenses. This is enforced in the database with row-level security, not just in the app. TripSplit has no ads and does not sell data. The website uses Google Analytics to count visits, with ad features switched off and trip IDs and invite codes removed from page addresses.',
   },
   {
     q: 'How do I sign in?',

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import AuthListener from '@/components/auth/AuthListener';
+import Analytics from '@/components/Analytics';
 import { SITE_URL } from '@/lib/marketing/site';
 import './globals.css';
 
@@ -35,6 +36,7 @@ export default function RootLayout({
     <html lang="en" className="h-full">
       <body className="h-full antialiased bg-gray-50">
           <AuthListener />
+          <Analytics />
           {children}
         </body>
     </html>
