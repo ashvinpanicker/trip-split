@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, use } from 'react';
+import { useEffect, useRef, useState, use } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { SplitSquareHorizontal, Users, Mail, Lock, User, Check } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
@@ -37,6 +37,8 @@ export default function JoinPage({ params }: { params: Promise<{ code: string }>
   const [status, setStatus] = useState<Status>('loading');
   const [authMode, setAuthMode] = useState<AuthMode>('signup');
   const [groupInfo, setGroupInfo] = useState<GroupInfo | null>(null);
+  // Join runs inside init(), before React re-renders with groupInfo, so read the group from a ref
+  const groupRef = useRef<GroupInfo | null>(null);
   const [pendingInfo, setPendingInfo] = useState<PendingInfo | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -59,7 +61,8 @@ export default function JoinPage({ params }: { params: Promise<{ code: string }>
         setStatus('error');
         return;
       }
-      setGroupInfo(groupData[0] as GroupInfo);
+      groupRef.current = groupData[0] as GroupInfo;
+      setGroupInfo(groupRef.current);
 
       // Load personal token info if present
       if (personalToken) {
@@ -138,26 +141,31 @@ export default function JoinPage({ params }: { params: Promise<{ code: string }>
 
   async function joinByCode() {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user || !groupInfo) return;
+    const group = groupRef.current;
+    if (!user || !group) {
+      setErrorMsg('Couldn’t join this group. Please sign in and open the link again.');
+      setStatus('error');
+      return;
+    }
 
     // Check already member
     const { data: existing } = await supabase
       .from('group_members')
       .select('id')
-      .eq('group_id', groupInfo.id)
+      .eq('group_id', group.id)
       .eq('user_id', user.id)
       .single();
 
     if (!existing) {
       await supabase.from('group_members').insert({
-        group_id: groupInfo.id,
+        group_id: group.id,
         user_id: user.id,
         role: 'member',
       });
     }
 
     setStatus('success');
-    setTimeout(() => router.replace(`/groups/${groupInfo.id}`), 1200);
+    setTimeout(() => router.replace(`/groups/${group.id}`), 1200);
   }
 
   async function handleGoogleLogin() {

@@ -43,13 +43,13 @@ begin
     insert into public.expenses
       (group_id, title, amount, date, paid_by, paid_by_pending, category, split_type, notes, created_by)
     values
-      (p_group_id, p_title, round(p_amount, 2), p_date, p_paid_by, p_paid_by_pending, p_category, p_split_type, p_notes, auth.uid())
+      (p_group_id, p_title, round(p_amount, 2), p_date, p_paid_by, p_paid_by_pending, p_category, p_split_type::public.split_type, p_notes, auth.uid())
     returning id into v_id;
   else
     update public.expenses
     set title = p_title, amount = round(p_amount, 2), date = p_date,
         paid_by = p_paid_by, paid_by_pending = p_paid_by_pending,
-        category = p_category, split_type = p_split_type, notes = p_notes
+        category = p_category, split_type = p_split_type::public.split_type, notes = p_notes
     where id = v_id;
     if not found then
       raise exception 'Expense not found or you can''t edit it';

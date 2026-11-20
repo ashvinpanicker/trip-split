@@ -1,152 +1,136 @@
-# TripSplit — Shared Expense Tracker
+<div align="center">
 
-A mobile-first expense sharing app built with Next.js 16, Supabase, and Tailwind CSS. Similar to Splitwise.
+# TripSplit
+
+**Split the trip, not the friendship.**
+The free, open-source Splitwise alternative: no daily expense limit, no ads, no Pro plan.
+
+[**Try it →**](https://trip-split.tailgrab.workers.dev) &nbsp;·&nbsp; [Why not Splitwise?](https://trip-split.tailgrab.workers.dev/splitwise-alternative) &nbsp;·&nbsp; [Self-host](#self-host-in-10-minutes)
+
+[![License: MIT](https://img.shields.io/badge/license-MIT-1a56db.svg)](LICENSE)
+[![Tests](https://img.shields.io/badge/money%20maths-tested-12805c.svg)](src/lib/utils/balance.test.ts)
+[![Next.js 16](https://img.shields.io/badge/Next.js-16-0f1e3d.svg)](https://nextjs.org)
+[![Cloudflare Workers](https://img.shields.io/badge/deploys%20on-Cloudflare%20Workers-f38020.svg)](https://workers.cloudflare.com)
+
+<img src="docs/screenshots/landing.png" alt="TripSplit landing page with a live settle-up example" width="860">
+
+</div>
 
 ---
+
+## Why
+
+Splitwise's free plan now caps how many expenses you can add per day and shows ads between entries. That's fine for a flat. It breaks on a trip, where ten friends log twenty expenses before lunch.
+
+TripSplit does the job for free, for good: open source, no premium tier, nothing held back.
+
+<table>
+<tr>
+<td align="center"><img src="docs/screenshots/expenses.png" width="250" alt="Group expenses"><br><sub>Log everything, no daily cap</sub></td>
+<td align="center"><img src="docs/screenshots/add-expense.png" width="250" alt="Add expense form"><br><sub>Equal, % or exact splits, to the paisa</sub></td>
+<td align="center"><img src="docs/screenshots/settle-up.png" width="250" alt="Smart settle-up"><br><sub>15 payments → 5 with smart settle</sub></td>
+</tr>
+</table>
 
 ## Features
 
-- **Auth** — Email + Google OAuth via Supabase Auth
-- **Groups** — Create groups, join via invite code, view members
-- **Expenses** — Add, edit, delete expenses with title, amount, date, payer, participants, notes
-- **Split types** — Equal, percentage, and fixed amount splits
-- **Balances** — Net balances per user, simplified debt settlements
-- **Settle up** — Record payments ("Mark paid") so balances actually clear; one-tap **Pay via UPI** when the receiver has a UPI ID in their profile
-- **People without accounts** — Add friends by name; they can be in splits *and* be the payer. Their history moves over when they claim their invite link
-- **Categories** — Food, drinks, stay, travel, activities… with a "where the money went" breakdown
-- **Mobile-first** — Bottom nav, installable to home screen (PWA)
+- **Unlimited expenses.** No counters, no timers, no ads.
+- **Smart settle-up.** The fewest payments that clear every balance (exact for groups of up to 14 people with a balance), or switch to "Direct" to pay back exactly who paid for you.
+- **Splits that always add up.** Equal, percentage or exact amounts. A split that's off by even 1 paisa can't be saved, and the database enforces it too.
+- **Friends join from one link.** Add people by name, start logging, then drop one link in WhatsApp. Each person taps their name and inherits everything already logged for them.
+- **One-tap UPI.** "Pay via UPI" opens GPay / PhonePe / Paytm with the amount filled in. TripSplit never touches money.
+- **No install.** Mobile-first web app, add it to your home screen.
+- **Private by default.** Row-level security means only group members can read a group.
 
----
+## The maths
 
-## Tech Stack
+The maths is the whole point, so it's isolated in one module ([`src/lib/utils/balance.ts`](src/lib/utils/balance.ts)) and tested hard.
 
-| Layer | Technology |
-|-------|-----------|
-| Frontend | Next.js 16 (App Router), React, TypeScript |
-| Styling | Tailwind CSS v4 |
-| Backend | Supabase (Auth, PostgreSQL, RLS) |
-| Deployment | Cloudflare Workers (OpenNext adapter) |
+- **Integer paise everywhere.** No floating-point drift, ever.
+- **Equal splits** hand leftover paise out one at a time, so ₹100 ÷ 3 = 33.34 + 33.33 + 33.33.
+- **Percentage splits** use largest-remainder rounding, so they always sum to the total exactly.
+- **Smart settle** finds the true minimum number of payments. Minimum = (people with a balance) − (the most groups whose balances already cancel out). We solve that partition exactly with a bitmask search for up to 14 people with non-zero balances, then fall back to greedy matching.
+- **Atomic saves.** An expense and its split are written in one database transaction ([`save_expense`](supabase/atomic_expenses.sql)), which rejects any split that doesn't match the amount.
 
----
+```bash
+npm test   # 34 tests, thousands of randomised cases
+```
 
-## Project Structure
+The tests check that splits always sum to the total, that balances always sum to zero, that the smart plan clears everyone to the paisa, and that it matches an independent brute-force minimum. Cloudflare runs them before every deploy, so broken maths can't ship.
+
+## Tech
+
+| | |
+|---|---|
+| App | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4 |
+| Data and auth | Supabase (Postgres, row-level security, Google / email auth) |
+| Hosting | Cloudflare Workers via [OpenNext](https://opennext.js.org/cloudflare) |
+| Tests | Vitest |
+
+## Self-host in 10 minutes
+
+**1. Supabase:** create a free project, then run these in the SQL editor, in order:
+
+```
+supabase/schema.sql
+supabase/fix_rls_recursion.sql
+supabase/add_pending_members.sql
+supabase/goa_upgrade.sql
+supabase/one_link_invites.sql
+supabase/atomic_expenses.sql
+```
+
+Under **Authentication → URL Configuration**, set your site URL and add `https://YOUR-DOMAIN/api/auth/callback**` as a redirect URL. Enable Google under **Providers** if you want one-tap sign-in.
+
+**2. Run locally**
+
+```bash
+git clone https://github.com/ashvinpanicker/trip-split && cd trip-split
+cp .env.example .env.local     # add your Supabase URL + anon key
+npm install
+npm run dev                    # http://localhost:3000
+```
+
+**3. Deploy to Cloudflare** (free tier is plenty)
+
+- Dashboard → **Workers & Pages → Create → Import a repository**
+- Build command: `npm test && npx opennextjs-cloudflare build`
+- Deploy command: `npx opennextjs-cloudflare deploy`
+- Build variables: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and optionally `NEXT_PUBLIC_SITE_URL` (your public URL, used for SEO canonicals)
+
+Or from your machine: `npx wrangler login && npm run deploy`.
+
+## Project structure
 
 ```
 src/
-├── app/
-│   ├── (auth)/           # Login & register pages
-│   ├── (app)/            # Protected pages with bottom nav
-│   │   ├── dashboard/    # Home feed with balance summary
-│   │   ├── groups/       # Groups list + group detail [id]
-│   │   ├── balances/     # Cross-group balance overview
-│   │   └── profile/      # User profile + sign out
-│   ├── api/auth/callback/ # OAuth callback
-│   └── join/[code]/      # Invite link join page
-├── components/
-│   ├── ui/               # Button, Input, Avatar, Card, Modal, Toast, EmptyState
-│   ├── layout/           # AppHeader, BottomNav
-│   ├── expenses/         # ExpenseCard, AddExpenseModal
-│   ├── groups/           # CreateGroupModal, JoinGroupModal, InviteCard
-│   └── balances/         # BalanceList, SettlementList
-├── hooks/                # useUser, useGroups, useExpenses
-├── lib/
-│   ├── supabase/         # client, server, proxy helpers
-│   └── utils/            # balance engine, cn utility
-├── types/                # TypeScript types
-└── proxy.ts              # Auth guard (Next.js 16)
-supabase/
-└── schema.sql            # Full DB schema with RLS policies
+  app/(marketing)/      public SEO pages: landing, /splitwise-alternative, /how-to-split-trip-expenses
+  app/(app)/            the app: dashboard, groups, balances, profile
+  app/join/[code]/      invite links ("Which one are you?")
+  lib/utils/balance.ts  all money maths  ← start here
+  lib/utils/balance.test.ts
+supabase/               schema + migrations (run in order above)
 ```
 
----
+The public site ships `sitemap.xml`, `robots.txt` (private routes excluded), [`llms.txt`](https://trip-split.tailgrab.workers.dev/llms.txt) for AI assistants, and schema.org data (WebApplication, FAQPage, HowTo, Article).
 
-## Database Schema
+## Roadmap
 
-```
-profiles            — user profiles (auto-created on signup trigger)
-groups              — expense groups with auto-generated invite_code
-group_members       — users ↔ groups (roles: admin/member)
-expenses            — individual expenses per group
-expense_participants — per-user share amounts for each expense
-```
+- [ ] Multiple currencies on one trip
+- [ ] Import from Splitwise CSV
+- [ ] Receipt photos
+- [ ] Offline mode
 
-All tables use Row Level Security (RLS). Users only see data for groups they belong to.
+Ideas and PRs welcome. Open an issue first for anything big.
 
----
+## Contributing
 
-## Getting Started
+1. Fork, branch, `npm install`
+2. Keep money logic in `balance.ts`, with tests
+3. `npm test && npx tsc --noEmit` before opening a PR
 
-### 1. Create a Supabase Project
+## License
 
-1. Go to [supabase.com](https://supabase.com) and create a project
-2. In **SQL Editor**, run these in order: `supabase/schema.sql`, `supabase/fix_rls_recursion.sql`, `supabase/add_pending_members.sql`, `supabase/goa_upgrade.sql`
-   (Existing database? Just run `supabase/goa_upgrade.sql` — it's safe to re-run.)
-3. In **Authentication > Providers**, enable Email and Google OAuth
-4. In **Authentication > URL Configuration**, set:
-   - Site URL: `https://trip-split.<your-subdomain>.workers.dev`
-   - Redirect URLs: `https://trip-split.<your-subdomain>.workers.dev/api/auth/callback**`
+[MIT](LICENSE) © 2026 Ashvin Panicker. Use it, fork it, self-host it.
 
-### 2. Configure Environment
-
-```bash
-cp .env.example .env.local
-```
-
-```env
-NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGci...
-```
-
-### 3. Run Locally
-
-```bash
-npm install
-npm run dev
-```
-
----
-
-## Deploy to Cloudflare
-
-Uses [`@opennextjs/cloudflare`](https://opennext.js.org/cloudflare). Config lives in `wrangler.jsonc` and `open-next.config.ts`.
-
-**Option A — Git integration (auto-deploys on push)**
-
-1. Cloudflare dashboard → **Workers & Pages → Create → Import a repository** → pick this repo
-2. Build command: `npx opennextjs-cloudflare build`
-3. Deploy command: `npx opennextjs-cloudflare deploy`
-4. Under **Build variables**, add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` (they're baked in at build time)
-
-**Option B — from your laptop**
-
-```bash
-npx wrangler login
-npm run deploy      # reads .env.local
-```
-
-Test locally in the Workers runtime with `npm run preview`.
-
-After the first deploy, put the `*.workers.dev` URL into Supabase's Site URL and Redirect URLs.
-
-> Note: auth guard lives in `src/middleware.ts` (not `proxy.ts`) because OpenNext's support for Next 16's Node-runtime proxy is still experimental on Cloudflare.
-
----
-
-## Balance Calculation
-
-The engine in `src/lib/utils/balance.ts`:
-
-1. **Net balance per user** — Credit payer for others' shares, debit each participant, then apply recorded payments
-2. **Simplified settlements** — Greedy min-transactions algorithm
-
-**Example:** Ashvin paid ₹4000 for 4 people (equal split = ₹1000 each).
-- Net: Ashvin +₹3000, others −₹1000 each
-- Settlements: 3 payments of ₹1000 each to Ashvin
-
----
-
-## Invite Links
-
-Groups get an 8-character invite code. Users can join via:
-- The "Join Group" flow in the app
-- Direct URL: `https://your-app.com/join/[code]`
+<sub>Splitwise is a trademark of Splitwise, Inc. TripSplit is an independent open-source project and is not affiliated with Splitwise.</sub>

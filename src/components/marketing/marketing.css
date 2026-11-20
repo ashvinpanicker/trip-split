@@ -41,6 +41,8 @@
   background-image:
     linear-gradient(to right, transparent 2.6rem, var(--margin) 2.6rem, var(--margin) calc(2.6rem + 1.5px), transparent calc(2.6rem + 1.5px)),
     repeating-linear-gradient(to bottom, transparent 0, transparent 2.35rem, var(--rule) 2.35rem, var(--rule) calc(2.35rem + 1px));
+  /* rows start 1.175rem down (figure padding), so offset the rules to sit under each row */
+  background-position: 0 0, 0 calc(1.175rem - 1px);
   border: 1px solid var(--rule);
   border-radius: 14px;
   box-shadow: 0 1px 0 var(--rule), 0 18px 40px -24px rgba(15, 30, 61, 0.35);

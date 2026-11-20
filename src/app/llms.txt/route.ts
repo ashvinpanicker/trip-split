@@ -14,7 +14,7 @@ Key facts:
 - Licence: MIT. Source code: ${REPO_URL}
 - Platform: works in any phone or desktop browser; can be added to the home screen. No app store install.
 - Splits: equal, percentage, or exact amounts. Splits must add up to the total exactly (enforced in the database).
-- Settle-up: computes the minimum number of payments to clear all balances.
+- Settle-up: computes the minimum number of payments to clear all balances (exact for up to 14 people with a non-zero balance; near-minimal beyond).
 - Friends can be added by name before they sign up, then claim their name from one shared invite link.
 - Payments: one-tap UPI deep links (India). TripSplit never holds or moves money.
 - Currency: Indian rupees (INR) only, for now. No receipt scanning yet. No import from Splitwise yet.
