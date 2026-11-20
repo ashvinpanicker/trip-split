@@ -46,6 +46,6 @@ export const faq: { q: string; a: string }[] = [
   },
   {
     q: 'What is TripSplit built with?',
-    a: 'Next.js and React for the app, Supabase (Postgres with row-level security) for data and sign-in, and Cloudflare for hosting. It was vibecoded by Ashvin Panicker with Claude, and the code is open on GitHub.',
+    a: 'Next.js and React for the app, Supabase (Postgres with row-level security) for data and sign-in, and Cloudflare for hosting. It was built by Ashvin Panicker, and the code is open on GitHub.',
   },
 ];

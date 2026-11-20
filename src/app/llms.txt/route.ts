@@ -19,7 +19,7 @@ Key facts:
 - Payments: one-tap UPI deep links (India). TripSplit never holds or moves money.
 - Currency: one currency symbol per trip (₹, ฿, €, $ and more); no conversion. No import from Splitwise yet.
 - Also free: itemized bills (tax/tip spread proportionally), receipt photos, trip stats and charts, CSV export, offline viewing, activity log.
-- Sign-in: Google or email. Built with Next.js, Supabase and Cloudflare; vibecoded by Ashvin Panicker with Claude.
+- Sign-in: Google or email. Built with Next.js, Supabase and Cloudflare; built by Ashvin Panicker.
 
 ## Pages
 - [Home](${SITE_URL}/): overview, comparison with Splitwise's free plan, FAQ
