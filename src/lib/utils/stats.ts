@@ -19,6 +19,7 @@ export function tripStats(expenses: StatExpense[], persons: BalancePerson[]) {
   const add = (m: Map<string, number>, k: string, v: number) => m.set(k, (m.get(k) || 0) + v);
   const byCat = new Map<string, number>();
   const byDay = new Map<string, number>();
+  const dayCat = new Map<string, Map<string, number>>(); // date → category → paise
   const paid = new Map<string, number>();
   const consumed = new Map<string, number>();
   const catPaid = new Map<string, Map<string, number>>(); // category → payer → paise
@@ -29,6 +30,8 @@ export function tripStats(expenses: StatExpense[], persons: BalancePerson[]) {
     const cat = categoryOf(e.category).key;
     add(byCat, cat, amt);
     add(byDay, e.date, amt);
+    if (!dayCat.has(e.date)) dayCat.set(e.date, new Map());
+    add(dayCat.get(e.date)!, cat, amt);
     const payer = payerIdOf(e);
     if (payer) {
       add(paid, payer, amt);
@@ -82,6 +85,16 @@ export function tripStats(expenses: StatExpense[], persons: BalancePerson[]) {
     byCategory: CATEGORIES.map((c) => ({ key: c.key, label: c.label, emoji: c.emoji, total: rupees(byCat.get(c.key) || 0) }))
       .filter((c) => c.total > 0).sort((a, b) => b.total - a.total),
     byDay: days.map((d) => ({ date: d, total: rupees(byDay.get(d) || 0) })),
+    /** Each day split by category, in the fixed category order (for a stacked chart) */
+    byDayCategory: days.map((d) => ({
+      date: d,
+      total: rupees(byDay.get(d) || 0),
+      parts: CATEGORIES.map((c) => ({ key: c.key, total: rupees(dayCat.get(d)?.get(c.key) || 0) })).filter((x) => x.total > 0),
+    })),
+    /** Paid upfront minus own share, per person: positive = fronted money for others */
+    fronted: [...new Set([...paid.keys(), ...consumed.keys()])]
+      .map((id) => ({ id, name: name(id), paid: rupees(paid.get(id) || 0), share: rupees(consumed.get(id) || 0), net: rupees((paid.get(id) || 0) - (consumed.get(id) || 0)) }))
+      .sort((a, b) => b.net - a.net),
     paidUpfront: ranked(paid),
     spent: ranked(consumed),
     biggest: biggest ? { title: biggest.title, amount: Number(biggest.amount), payer: name(payerIdOf(biggest) ?? '') } : null,

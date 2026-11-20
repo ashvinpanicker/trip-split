@@ -34,6 +34,17 @@ describe('tripStats', () => {
     expect(s.biggest).toEqual({ title: 'Villa', amount: 4000, payer: 'A' });
   });
 
+  it('per-day category split and fronted money add up', () => {
+    expect(s.byDayCategory).toEqual([
+      { date: '2026-11-20', total: 5200, parts: [{ key: 'drinks', total: 1200 }, { key: 'stay', total: 4000 }] },
+      { date: '2026-11-21', total: 1200, parts: [{ key: 'food', total: 1200 }] },
+    ]);
+    for (const d of s.byDayCategory) expect(d.parts.reduce((x, p) => x + p.total, 0)).toBeCloseTo(d.total, 2);
+    // A paid 4300, share 1000 + 300 + 150 = 1450
+    expect(s.fronted[0]).toEqual({ id: 'A', name: 'A', paid: 4300, share: 1450, net: 2850 });
+    expect(s.fronted.reduce((x, f) => x + f.net, 0)).toBeCloseTo(0, 2); // money in = money out
+  });
+
   it('awards go to the right people', () => {
     const award = (t: string) => s.awards.find((a) => a.title === t)?.who;
     expect(award('The group bank')).toBe('A');

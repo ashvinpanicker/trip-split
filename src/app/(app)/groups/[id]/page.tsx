@@ -2,7 +2,7 @@
 
 import { useState, use } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Plus, Users, BarChart2, Receipt, Copy, Check, Trash2, History, Scale, Search, Download } from 'lucide-react';
+import { ArrowLeft, Plus, Users, Receipt, Copy, Check, Trash2, History, Search, Download } from 'lucide-react';
 import { format } from 'date-fns';
 import AppHeader from '@/components/layout/AppHeader';
 import Button from '@/components/ui/Button';
@@ -155,9 +155,30 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
           </button>
         }
         right={
-          <Button size="sm" onClick={() => setShowAddExpense(true)}>
-            <Plus size={14} className="mr-1" /> Add
-          </Button>
+          // Less-used views live here; the bottom bar's + already adds expenses to this trip
+          <div className="flex items-center gap-1">
+            {([
+              { key: 'members', label: `People (${allPersons.length})`, icon: Users, badge: allPersons.length },
+              { key: 'activity', label: 'Activity', icon: History, badge: 0 },
+            ] as const).map(({ key, label, icon: Icon, badge }) => (
+              <button
+                key={key}
+                onClick={() => setTab(tab === key ? 'expenses' : key)}
+                aria-label={label}
+                aria-pressed={tab === key}
+                className={`relative h-10 w-10 inline-flex items-center justify-center rounded-xl transition-colors ${
+                  tab === key ? 'bg-blue-50 text-blue-600' : 'text-gray-500 hover:bg-gray-100'
+                }`}
+              >
+                <Icon size={19} />
+                {badge > 0 && (
+                  <span className="absolute top-1 right-0.5 min-w-4 h-4 px-1 rounded-full bg-gray-900 text-white text-[10px] font-semibold leading-4 text-center tabular-nums">
+                    {badge}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
         }
       />
 
@@ -181,29 +202,35 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="bg-white border-b border-gray-100">
-        <div className="flex">
+      {/* Main views: a compact segmented switch */}
+      <div className="bg-white border-b border-gray-100 px-4 py-2">
+        <div role="tablist" aria-label="Trip views" className="grid grid-cols-3 gap-1 rounded-xl bg-gray-100 p-1">
           {([
-            { key: 'expenses', label: 'Expenses', icon: Receipt },
-            { key: 'balances', label: 'Balances', icon: Scale },
-            { key: 'stats', label: 'Stats', icon: BarChart2 },
-            { key: 'members', label: 'People', icon: Users },
-            { key: 'activity', label: 'Activity', icon: History },
-          ] as const).map(({ key, label, icon: Icon }) => (
+            { key: 'expenses', label: 'Expenses' },
+            { key: 'balances', label: 'Balances' },
+            { key: 'stats', label: 'Stats' },
+          ] as const).map(({ key, label }) => (
             <button
               key={key}
+              role="tab"
+              aria-selected={tab === key}
               onClick={() => setTab(key)}
-              className={`flex-1 min-w-0 flex items-center justify-center gap-1 py-3 text-[13px] sm:text-sm font-medium border-b-2 transition-colors ${
-                tab === key ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500'
+              className={`h-9 rounded-lg text-sm font-medium transition-colors ${
+                tab === key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              <Icon size={14} className="shrink-0 hidden sm:block" />
-              <span className="truncate">{label}</span>
+              {label}
             </button>
           ))}
         </div>
       </div>
+
+      {(tab === 'members' || tab === 'activity') && (
+        <div className="px-4 pt-3 -mb-1 flex items-center justify-between">
+          <h2 className="font-semibold text-gray-900">{tab === 'members' ? 'People' : 'Activity'}</h2>
+          <button onClick={() => setTab('expenses')} className="text-sm text-blue-600 font-medium">Done</button>
+        </div>
+      )}
 
       <div className="flex-1 p-4 space-y-3">
         {/* Expenses tab */}
