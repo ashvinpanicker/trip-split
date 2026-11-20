@@ -7,7 +7,7 @@ import { REPO_URL, SITE_URL, jsonLd } from '@/lib/marketing/site';
 export const metadata: Metadata = {
   title: { absolute: 'TripSplit — Free Splitwise alternative with no daily limit' },
   description:
-    'Split trip and group expenses with friends for free. No daily expense limit, no ads, no Pro plan. Smart settle-up, UPI pay, works in any phone browser. Open source.',
+    'Split trip and group expenses with friends, free. No daily limit, no ads, no Pro plan. Smart settle-up, UPI pay, works in any browser. Open source.',
   alternates: { canonical: '/' },
 };
 

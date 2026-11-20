@@ -5,13 +5,13 @@ import { demoDirect, demoSmart } from '@/lib/marketing/demo';
 
 const title = 'Free Splitwise alternative with no daily limit (2026)';
 const description =
-  'Hit Splitwise’s daily expense limit? TripSplit is a free, open-source alternative: unlimited expenses, no ads, smart settle-up and UPI. Here’s how it compares and how to switch.';
+  'Hit Splitwise’s daily limit? TripSplit is a free, open-source alternative with unlimited expenses, no ads and smart settle-up. How it compares and how to switch.';
 
 export const metadata: Metadata = {
   title,
   description,
   alternates: { canonical: '/splitwise-alternative' },
-  openGraph: { title, description, url: '/splitwise-alternative', type: 'article' },
+  openGraph: { title, description, url: '/splitwise-alternative', type: 'article', images: [{ url: '/og.png', width: 1200, height: 630, alt: 'TripSplit: split the trip, not the friendship' }] },
 };
 
 export default function SplitwiseAlternative() {
@@ -24,6 +24,7 @@ export default function SplitwiseAlternative() {
     mainEntityOfPage: `${SITE_URL}/splitwise-alternative`,
     author: { '@type': 'Organization', name: 'TripSplit', url: SITE_URL },
     publisher: { '@type': 'Organization', name: 'TripSplit', url: SITE_URL },
+    image: `${SITE_URL}/og.png`,
   };
 
   return (

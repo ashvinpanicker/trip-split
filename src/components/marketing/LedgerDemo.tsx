@@ -27,10 +27,10 @@ export default function LedgerDemo() {
         <span className="font-bold text-[1.05rem]">Goa weekend</span>
         <span className="num text-[var(--ink-soft)]">{inr(demoTotal)} spent</span>
       </div>
-      <div className="ledger-row text-[var(--ink-soft)]">6 friends, {demoExpenses.length} expenses, everyone paid for something</div>
+      <div className="ledger-row text-[var(--ink-soft)]">6 friends, {demoExpenses.length} expenses</div>
 
       <div className="ledger-row strike justify-between" style={{ ['--d' as string]: '0.6s' }}>
-        <span>Everyone pays back directly</span>
+        <span>Pay everyone back</span>
         <span className="flex items-center gap-2 text-[var(--ink-soft)]">
           <Tally count={demoDirect.length} />
           <span className="num">{demoDirect.length}</span>
@@ -38,7 +38,7 @@ export default function LedgerDemo() {
       </div>
 
       <div className="ledger-row land justify-between font-semibold" style={{ ['--d' as string]: '1s' }}>
-        <span className="text-[var(--blue)]">TripSplit smart settle</span>
+        <span className="text-[var(--blue)]">Smart settle</span>
         <span className="flex items-center gap-2 text-[var(--blue)]">
           <Tally count={demoSmart.length} />
           <span className="num">{demoSmart.length}</span>

@@ -5,15 +5,15 @@ import { demoBalances, demoDirect, demoExpenses, demoSmart, demoTotal } from '@/
 import { formatCurrency } from '@/lib/utils/balance';
 
 const inr = (n: number) => formatCurrency(n).replace('.00', '');
-const title = 'How to split trip expenses with friends, fairly and without the maths';
+const title = 'How to split trip expenses with friends';
 const description =
-  'A practical guide to splitting group trip costs: who pays, how to handle uneven shares, and how to settle up in the fewest payments. With a worked Goa example.';
+  'Split group trip costs fairly: who pays, uneven shares, and settling up in the fewest payments. A practical guide with a worked Goa example.';
 
 export const metadata: Metadata = {
   title,
   description,
   alternates: { canonical: '/how-to-split-trip-expenses' },
-  openGraph: { title, description, url: '/how-to-split-trip-expenses', type: 'article' },
+  openGraph: { title, description, url: '/how-to-split-trip-expenses', type: 'article', images: [{ url: '/og.png', width: 1200, height: 630, alt: 'TripSplit: split the trip, not the friendship' }] },
 };
 
 const steps = [
