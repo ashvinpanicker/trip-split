@@ -34,6 +34,7 @@ export interface Group {
   currency?: string;
   kind?: string;
   track_only?: boolean;
+  archived_at?: string | null;
   created_at: string;
   updated_at: string;
   member_count?: number;

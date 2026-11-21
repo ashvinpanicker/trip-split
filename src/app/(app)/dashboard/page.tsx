@@ -26,6 +26,10 @@ export default function DashboardPage() {
 
   // Same maths as the group pages: per-group net (incl. recorded payments), summed per currency
   const colors = groupColors(groups);
+  // Archived trips leave the dashboard, but their balances still count below
+  const active = groups.filter((g) => !g.archived_at);
+  const archivedIds = new Set(groups.filter((g) => g.archived_at).map((g) => g.id));
+  const recent = expenses.filter((e) => !archivedIds.has(e.group_id));
   const currencyOf = (gid: string) => groups.find((g) => g.id === gid)?.currency || 'INR';
   // Tracking-only trips (e.g. family) have no balances, so they stay out of owed/owe totals
   const settling = Object.fromEntries(Object.entries(myNetByGroup(user.id, totals.expenses, totals.payments)).filter(([gid]) => !groups.find((g) => g.id === gid)?.track_only));
@@ -74,7 +78,7 @@ export default function DashboardPage() {
         </Card>
 
         {/* Groups quick access */}
-        {groups.length > 0 && (
+        {active.length > 0 && (
           <div>
             <div className="flex items-center justify-between mb-3">
               <h2 className="font-semibold text-gray-900">Your Groups</h2>
@@ -83,7 +87,7 @@ export default function DashboardPage() {
               </button>
             </div>
             <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1">
-              {groups.slice(0, 5).map((g) => (
+              {active.slice(0, 5).map((g) => (
                 <button
                   key={g.id}
                   onClick={() => router.push(`/groups/${g.id}`)}
@@ -111,7 +115,7 @@ export default function DashboardPage() {
                 <div key={i} className="h-20 bg-gray-100 rounded-2xl animate-pulse" />
               ))}
             </div>
-          ) : expenses.length === 0 ? (
+          ) : recent.length === 0 ? (
             <EmptyState
               icon={Users}
               title="No expenses yet"
@@ -119,14 +123,14 @@ export default function DashboardPage() {
             />
           ) : (
             <div className="space-y-3">
-              {expenses.slice(0, 10).map((expense) => (
+              {recent.slice(0, 10).map((expense) => (
                 <ExpenseCard
                   key={expense.id}
                   expense={expense}
                   currentUserId={user.id}
                   currency={currencyOf(expense.group_id)}
                   group={
-                    groups.length > 1 && groups.find((g) => g.id === expense.group_id)
+                    active.length > 1 && groups.find((g) => g.id === expense.group_id)
                       ? { id: expense.group_id, name: groups.find((g) => g.id === expense.group_id)!.name, color: colors[expense.group_id] }
                       : undefined
                   }

@@ -124,6 +124,16 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
     else { toast(`Amounts now shown in ${code}`); refetchGroup(); }
   }
 
+  // Archiving only tidies the dashboard; balances still count
+  async function setArchived(archive: boolean) {
+    if (archive && settlements.length > 0 && !trackOnly &&
+        !confirm('Some balances are still open. Archive anyway? They will still count in your totals.')) return;
+    const { error } = await createClient().from('groups')
+      .update({ archived_at: archive ? new Date().toISOString() : null }).eq('id', id);
+    if (error) toast(error.message, 'error');
+    else { toast(archive ? 'Trip archived' : 'Trip restored'); refetchGroup(); }
+  }
+
   function exportCsv() {
     const csv = expensesCsv(expensesWithParts, allPersons, group!.currency || 'INR');
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
@@ -197,6 +207,12 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
           </div>
         }
       />
+      {group.archived_at && (
+        <div className="mx-4 mt-3 flex items-center justify-between gap-3 rounded-xl bg-gray-100 px-3 py-2 text-sm text-gray-600">
+          <span>This trip is archived.</span>
+          {isAdmin && <button onClick={() => setArchived(false)} className="font-medium text-blue-600">Restore</button>}
+        </div>
+      )}
 
       {/* Stats */}
       <div className="bg-white border-b border-gray-100 px-4 py-3">
@@ -404,6 +420,13 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
                 <p className="text-xs text-gray-500 mt-3">
                   Admins can also make others admin below, and turn on simplified payments in Balances.
                 </p>
+                <button
+                  onClick={() => setArchived(!group.archived_at)}
+                  className="mt-4 w-full rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  {group.archived_at ? 'Restore trip' : 'Archive trip'}
+                </button>
+                {!group.archived_at && <p className="text-xs text-gray-500 mt-2">Trip over? Archiving hides it from your home screen. Nothing is deleted.</p>}
               </Card>
             )}
             <AddPeopleCard
