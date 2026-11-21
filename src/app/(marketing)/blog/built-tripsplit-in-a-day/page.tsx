@@ -47,9 +47,9 @@ export default function Page() {
 
       <h2>What went wrong</h2>
       <p>
-        Not everything was smooth. One morning a database change broke adding expenses for about twenty minutes, live, while the group was
-        using it. It got fixed, and it’s why every money-related change now ships with tests that run before each deploy. The other lesson:
-        half the group made a backup Splitwise group “just in case”. That pushed us to build the trust features above, not more charts.
+        Not everything was smooth. A database change briefly broke adding expenses, live, while the group was using it. It got fixed fast,
+        and it’s why every money-related change now ships with tests that run before each deploy. The bigger lesson was trust: when it’s
+        everyone’s money, people want to see exactly where each number came from. That pushed us to build the trust features above, not more charts.
       </p>
 
       <h2>Why it’s free and open source</h2>
