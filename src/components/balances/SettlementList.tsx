@@ -1,14 +1,44 @@
+'use client';
+
+import { useState } from 'react';
+import { ArrowRight, Check, Copy, ExternalLink, MessageCircle } from 'lucide-react';
 import Avatar from '@/components/ui/Avatar';
-import { ArrowRight } from 'lucide-react';
-import { formatCurrency } from '@/lib/utils/balance';
+import { useToast } from '@/components/ui/Toast';
+import { createClient } from '@/lib/supabase/client';
+import { formatCurrency, getActiveCurrency } from '@/lib/utils/balance';
+import { payActions, type PayMethod } from '@/lib/utils/payMethods';
 import type { Settlement } from '@/types';
 
 interface SettlementListProps {
   settlements: Settlement[];
   currentUserId: string;
+  /** When set, each row gets "Mark paid" (and pay buttons where possible). */
+  groupId?: string;
+  groupName?: string;
+  /** person id → ways they can be paid (UPI, PayPal, crypto…) */
+  payMethods?: Record<string, PayMethod[]>;
+  onRecorded?: () => void;
+  /** Open "You & X" for the other person on rows that involve you */
+  onOpenPerson?: (personId: string) => void;
+  /** Rows that aren't a real "who owes whom" debt (only possible when payments are simplified) */
+  isRerouted?: (s: Settlement) => boolean;
 }
 
-export default function SettlementList({ settlements, currentUserId }: SettlementListProps) {
+export default function SettlementList({
+  settlements, currentUserId, groupId, groupName, payMethods = {}, onRecorded, onOpenPerson, isRerouted,
+}: SettlementListProps) {
+  const { toast } = useToast();
+  const [savingIdx, setSavingIdx] = useState<number | null>(null);
+
+  async function copyAddress(label: string, value: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      toast(`Copied ${label} address. Check the network before sending.`);
+    } catch {
+      prompt(`Copy ${label} address:`, value);
+    }
+  }
+
   if (settlements.length === 0) {
     return (
       <div className="text-center py-6">
@@ -19,46 +49,161 @@ export default function SettlementList({ settlements, currentUserId }: Settlemen
     );
   }
 
+  async function markPaid(s: Settlement, idx: number) {
+    if (!groupId) return;
+    const who = s.from_id === currentUserId ? 'you' : s.from_name;
+    if (!confirm(`Record that ${who} paid ${s.to_id === currentUserId ? 'you' : s.to_name} ${formatCurrency(s.amount)}?`)) return;
+    setSavingIdx(idx);
+    const supabase = createClient();
+    const { error } = await supabase.from('settlements').insert({
+      group_id: groupId,
+      from_person: s.from_id,
+      to_person: s.to_id,
+      amount: s.amount,
+      created_by: currentUserId,
+    });
+    setSavingIdx(null);
+    if (error) {
+      toast(error.message.includes('settlements') ? 'Run supabase/goa_upgrade.sql first' : error.message, 'error');
+      return;
+    }
+    toast('Payment recorded');
+    onRecorded?.();
+  }
+
   return (
     <div className="space-y-3">
       {settlements.map((s, i) => {
         const isYouPaying = s.from_id === currentUserId;
         const isYouReceiving = s.to_id === currentUserId;
+        const actions = isYouPaying
+          ? payActions(payMethods[s.to_id] ?? [], s.amount, getActiveCurrency(), `${groupName ?? 'TripSplit'} settle-up`, s.to_name)
+          : [];
 
         return (
           <div
-            key={i}
-            className={`flex items-center gap-3 p-3 rounded-xl border ${
+            key={`${s.from_id}-${s.to_id}`}
+            className={`p-3 rounded-xl border ${
               isYouPaying ? 'bg-red-50 border-red-100' : isYouReceiving ? 'bg-green-50 border-green-100' : 'bg-gray-50 border-gray-100'
             }`}
           >
-            <div className="flex items-center gap-2 flex-1 min-w-0">
-              <Avatar name={isYouPaying ? 'You' : s.from_name} size="sm" />
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">
-                  {isYouPaying ? 'You' : s.from_name}
-                </p>
-                <p className="text-xs text-gray-500">pays</p>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <Avatar name={isYouPaying ? 'You' : s.from_name} size="sm" />
+                <p className="text-sm font-medium text-gray-900 truncate">{isYouPaying ? 'You' : s.from_name}</p>
+              </div>
+              <div className="flex flex-col items-center">
+                <span className={`text-sm font-bold ${isYouPaying ? 'text-red-600' : isYouReceiving ? 'text-green-600' : 'text-gray-900'}`}>
+                  {formatCurrency(s.amount)}
+                </span>
+                <ArrowRight size={14} className="text-gray-400" />
+              </div>
+              <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
+                <p className="text-sm font-medium text-gray-900 truncate text-right">{isYouReceiving ? 'You' : s.to_name}</p>
+                <Avatar name={isYouReceiving ? 'You' : s.to_name} size="sm" />
               </div>
             </div>
-            <div className="flex flex-col items-center">
-              <ArrowRight size={16} className="text-gray-400" />
-              <span className={`text-sm font-bold ${isYouPaying ? 'text-red-600' : isYouReceiving ? 'text-green-600' : 'text-gray-900'}`}>
-                {formatCurrency(s.amount)}
-              </span>
-            </div>
-            <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
-              <div className="min-w-0 text-right">
-                <p className="text-sm font-medium text-gray-900 truncate">
-                  {isYouReceiving ? 'You' : s.to_name}
-                </p>
-                <p className="text-xs text-gray-500">receives</p>
+
+            {(isRerouted?.(s) || (onOpenPerson && (isYouPaying || isYouReceiving))) && (
+              <div className="flex items-center justify-between gap-2 mt-1.5 text-xs">
+                <span className="text-gray-500">{isRerouted?.(s) ? 'Simplified: covers debts between others' : ''}</span>
+                {onOpenPerson && (isYouPaying || isYouReceiving) && (
+                  <button
+                    onClick={() => onOpenPerson(isYouPaying ? s.to_id : s.from_id)}
+                    className="font-medium text-blue-600 shrink-0"
+                  >
+                    See breakdown
+                  </button>
+                )}
               </div>
-              <Avatar name={isYouReceiving ? 'You' : s.to_name} size="sm" />
-            </div>
+            )}
+
+            {groupId && !(isYouPaying || isYouReceiving) && (
+              <div className="flex justify-end mt-1.5">
+                {isYouReceiving && (
+                  <a
+                    href={`https://wa.me/?text=${encodeURIComponent(
+                      `Hey ${s.from_name.split(' ')[0]}, quick nudge from ${groupName ?? 'our trip'}: you owe me ${formatCurrency(s.amount)}. ` +
+                        `The details and a pay button are here: ${typeof location !== 'undefined' ? location.origin : 'https://gotripsplit.app'}/groups/${groupId}`,
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-lg bg-white border border-green-200 text-green-700 text-sm font-medium"
+                  >
+                    <MessageCircle size={14} /> Remind
+                  </a>
+                )}
+                <button
+                  onClick={() => markPaid(s, i)}
+                  disabled={savingIdx !== null}
+                  className="text-xs font-medium text-gray-500 hover:text-blue-600 disabled:opacity-50"
+                >
+                  {savingIdx === i ? 'Saving…' : 'Mark paid'}
+                </button>
+              </div>
+            )}
+
+            {groupId && (isYouPaying || isYouReceiving) && (
+              <div className="mt-3 space-y-2">
+                {actions.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {actions.map((a, k) =>
+                      a.href ? (
+                        <a
+                          key={`${a.type}-${a.value}`}
+                          href={a.href}
+                          target={a.href.startsWith('https:') ? '_blank' : undefined}
+                          rel="noopener noreferrer"
+                          className={`flex-1 min-w-[7.5rem] flex items-center justify-center gap-1.5 h-9 rounded-lg text-sm font-medium ${
+                            k === 0 ? 'bg-blue-600 text-white active:bg-blue-700' : 'bg-white border border-blue-200 text-blue-700'
+                          }`}
+                        >
+                          Pay via {a.label} {a.href.startsWith('https:') && <ExternalLink size={12} />}
+                        </a>
+                      ) : (
+                        <button
+                          key={`${a.type}-${a.value}`}
+                          onClick={() => copyAddress(a.label, a.value)}
+                          className="flex-1 min-w-[7.5rem] flex items-center justify-center gap-1.5 h-9 rounded-lg bg-white border border-gray-200 text-gray-700 text-sm font-medium"
+                        >
+                          <Copy size={13} /> {a.label} address
+                        </button>
+                      ),
+                    )}
+                  </div>
+                )}
+              <div className="flex gap-2">
+                {isYouReceiving && (
+                  <a
+                    href={`https://wa.me/?text=${encodeURIComponent(
+                      `Hey ${s.from_name.split(' ')[0]}, quick nudge from ${groupName ?? 'our trip'}: you owe me ${formatCurrency(s.amount)}. ` +
+                        `The details and a pay button are here: ${typeof location !== 'undefined' ? location.origin : 'https://gotripsplit.app'}/groups/${groupId}`,
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-lg bg-white border border-green-200 text-green-700 text-sm font-medium"
+                  >
+                    <MessageCircle size={14} /> Remind
+                  </a>
+                )}
+                <button
+                  onClick={() => markPaid(s, i)}
+                  disabled={savingIdx !== null}
+                  className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-lg bg-white border border-gray-200 text-gray-700 text-sm font-medium active:bg-gray-50 disabled:opacity-50"
+                >
+                  <Check size={14} /> {savingIdx === i ? 'Saving…' : isYouReceiving ? 'Got it' : 'Mark paid'}
+                </button>
+              </div>
+              </div>
+            )}
           </div>
         );
       })}
+      {groupId && (
+        <p className="text-xs text-gray-400 text-center">
+          Add UPI, PayPal, Revolut, crypto and more in <a href="/profile" className="underline">Profile</a> so friends can pay you in one tap.
+        </p>
+      )}
     </div>
   );
 }

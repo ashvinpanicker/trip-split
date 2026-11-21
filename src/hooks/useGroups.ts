@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { createClient, getAuthUser } from '@/lib/supabase/client';
 import type { Group } from '@/types';
 
 export function useGroups() {
@@ -11,14 +11,14 @@ export function useGroups() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getAuthUser(supabase);
     if (!user) { setLoading(false); return; }
 
     const { data } = await supabase
       .from('group_members')
       .select(`
         group:groups (
-          id, name, description, created_by, invite_code, created_at, updated_at,
+          id, name, description, created_by, invite_code, currency, kind, track_only, archived_at, created_at, updated_at,
           member_count:group_members(count),
           expenses(count)
         )
@@ -60,7 +60,7 @@ export function useGroup(groupId: string) {
           *,
           members:group_members(
             id, user_id, role, joined_at,
-            profile:profiles(id, email, full_name, avatar_url)
+            profile:profiles(id, email, full_name, avatar_url, upi_id, pay_methods)
           )
         `)
         .eq('id', groupId)

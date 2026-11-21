@@ -1,0 +1,152 @@
+'use client';
+
+import type { PayMethod } from '@/lib/utils/payMethods';
+import { useMemo, useState } from 'react';
+import { ChevronDown, Share2 } from 'lucide-react';
+import Card from '@/components/ui/Card';
+import BalanceList from './BalanceList';
+import SettlementList from './SettlementList';
+import { formatCurrency } from '@/lib/utils/balance';
+import type { Balance, Settlement } from '@/types';
+
+interface SettleUpPanelProps {
+  balances: Balance[];
+  /** Everyone pays back exactly who paid for them (netted per pair) */
+  byPerson: Settlement[];
+  /** Fewest payments, preferring real debts */
+  simplified: Settlement[];
+  /** Group setting, changed by admins only */
+  simplify: boolean;
+  isAdmin: boolean;
+  onToggleSimplify: (next: boolean) => void;
+  onOpenPerson: (personId: string) => void;
+  currentUserId: string;
+  groupId: string;
+  groupName: string;
+  payMethods: Record<string, PayMethod[]>;
+  onRecorded: () => void;
+}
+
+export default function SettleUpPanel({
+  balances, byPerson, simplified, simplify, isAdmin, onToggleSimplify, onOpenPerson,
+  currentUserId, groupId, groupName, payMethods, onRecorded,
+}: SettleUpPanelProps) {
+  const [showAll, setShowAll] = useState(false);
+
+  const plan = simplify ? simplified : byPerson;
+  const realPairs = useMemo(() => new Set(byPerson.map((s) => `${s.from_id}>${s.to_id}`)), [byPerson]);
+  const mine = (s: Settlement) => s.from_id === currentUserId || s.to_id === currentUserId;
+  // Your payments first, then biggest amounts
+  const sorted = useMemo(
+    () => [...plan].sort((a, b) => Number(mine(b)) - Number(mine(a)) || b.amount - a.amount),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [plan, currentUserId]
+  );
+
+  const me = balances.find((b) => b.person_id === currentUserId)?.net_balance ?? 0;
+  const iOwe = plan.filter((s) => s.from_id === currentUserId);
+  const owedToMe = plan.filter((s) => s.to_id === currentUserId);
+  const saved = byPerson.length - simplified.length;
+
+  function shareText() {
+    const lines = plan.map((s) => `• ${s.from_name} → ${s.to_name}: ${formatCurrency(s.amount)}`);
+    return `💸 ${groupName}: settle up (${plan.length} payment${plan.length === 1 ? '' : 's'})\n\n${lines.join('\n')}\n\nDetails: ${window.location.origin}/groups/${groupId}`;
+  }
+
+  return (
+    <Card padding="none" className="overflow-hidden">
+      {/* Your status */}
+      <div className={`px-4 py-4 ${me > 0 ? 'bg-green-50' : me < 0 ? 'bg-red-50' : 'bg-gray-50'}`}>
+        <p className="text-xs font-medium text-gray-500">Your status</p>
+        {me === 0 ? (
+          <p className="text-lg font-bold text-gray-900">You&apos;re all settled 🎉</p>
+        ) : me > 0 ? (
+          <p className="text-lg font-bold text-green-700">You get back {formatCurrency(me)}</p>
+        ) : (
+          <p className="text-lg font-bold text-red-600">You owe {formatCurrency(-me)}</p>
+        )}
+        {(iOwe.length > 0 || owedToMe.length > 0) && (
+          <p className="text-xs text-gray-500 mt-0.5">
+            {iOwe.length > 0 && `${iOwe.length} payment${iOwe.length > 1 ? 's' : ''} to make`}
+            {iOwe.length > 0 && owedToMe.length > 0 && ' · '}
+            {owedToMe.length > 0 && `${owedToMe.length} to receive`}
+          </p>
+        )}
+      </div>
+
+      <div className="p-4 space-y-3">
+        {/* How payments are worked out */}
+        {(byPerson.length > 0 || simplified.length > 0) && (
+          <div className="rounded-xl bg-gray-50 px-3 py-2.5">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-gray-900">{simplify ? 'Simplified payments' : 'Pay back by person'}</p>
+                <p className="text-xs text-gray-500">
+                  {simplify
+                    ? `${simplified.length} payments instead of ${byPerson.length}. Some people pay someone other than who they owe.`
+                    : 'Everyone pays back exactly who paid for them.'}
+                </p>
+              </div>
+              {isAdmin && (
+                <button
+                  role="switch"
+                  aria-checked={simplify}
+                  aria-label="Simplify payments"
+                  onClick={() => onToggleSimplify(!simplify)}
+                  className={`relative shrink-0 w-11 h-6 rounded-full transition-colors ${simplify ? 'bg-blue-600' : 'bg-gray-300'}`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${simplify ? 'translate-x-5' : ''}`} />
+                </button>
+              )}
+            </div>
+            {!simplify && saved > 0 && (
+              <p className="text-xs text-blue-700 mt-1.5">
+                {isAdmin
+                  ? `Turn on Simplify to cut this to ${simplified.length} payments. Best for the final settle-up.`
+                  : `Your group admin can simplify this to ${simplified.length} payments for the final settle-up.`}
+              </p>
+            )}
+          </div>
+        )}
+
+        <SettlementList
+          settlements={sorted}
+          currentUserId={currentUserId}
+          groupId={groupId}
+          groupName={groupName}
+          payMethods={payMethods}
+          onRecorded={onRecorded}
+          onOpenPerson={onOpenPerson}
+          isRerouted={simplify ? (s) => !realPairs.has(`${s.from_id}>${s.to_id}`) : undefined}
+        />
+
+        {plan.length > 0 && (
+          <a
+            href={`https://wa.me/?text=${encodeURIComponent(typeof window !== 'undefined' ? shareText() : '')}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 h-10 rounded-xl bg-[#25D366] text-white text-sm font-semibold"
+          >
+            <Share2 size={16} /> Share plan on WhatsApp
+          </a>
+        )}
+      </div>
+
+      {/* Everyone's balance, collapsed by default; tap a person for the breakdown */}
+      <button
+        onClick={() => setShowAll((v) => !v)}
+        className="w-full flex items-center justify-between px-4 py-3 border-t border-gray-100 text-sm font-medium text-gray-700"
+        aria-expanded={showAll}
+      >
+        Everyone&apos;s balance
+        <ChevronDown size={16} className={`transition-transform ${showAll ? 'rotate-180' : ''}`} />
+      </button>
+      {showAll && (
+        <div className="px-4 pb-4">
+          <p className="text-xs text-gray-500 mb-1">Tap someone to see what&apos;s between you.</p>
+          <BalanceList balances={balances} currentUserId={currentUserId} onSelect={onOpenPerson} />
+        </div>
+      )}
+    </Card>
+  );
+}

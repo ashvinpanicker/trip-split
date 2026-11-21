@@ -1,8 +1,11 @@
 'use client';
 
+import { LogoMark } from '@/components/Logo';
+import GoogleSignIn from '@/components/auth/GoogleSignIn';
+
 import { useState } from 'react';
 import Link from 'next/link';
-import { Mail, Lock, User, SplitSquareHorizontal } from 'lucide-react';
+import { Mail, Lock, User } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
@@ -65,9 +68,7 @@ export default function RegisterPage() {
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mb-3 shadow-lg shadow-blue-200">
-            <SplitSquareHorizontal size={32} className="text-white" />
-          </div>
+          <LogoMark size={64} className="mb-3 shadow-lg shadow-blue-200 rounded-2xl" />
           <h1 className="text-2xl font-bold text-gray-900">TripSplit</h1>
           <p className="text-gray-500 text-sm mt-1">Split expenses, not friendships</p>
         </div>
@@ -81,6 +82,11 @@ export default function RegisterPage() {
             </div>
           )}
 
+          <GoogleSignIn next="/dashboard" onError={setError} />
+          <div className="relative my-5">
+            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200" /></div>
+            <div className="relative flex justify-center text-xs"><span className="bg-white px-3 text-gray-400">or sign up with email</span></div>
+          </div>
           <form onSubmit={handleRegister} className="flex flex-col gap-4">
             <Input
               label="Full name"

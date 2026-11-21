@@ -44,7 +44,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             )}
           >
             {t.type === 'success' ? <CheckCircle size={16} /> : <XCircle size={16} />}
-            <span className="flex-1">{t.message}</span>
+            <span className="flex-1 min-w-0 break-words">{t.message}</span>
             <button onClick={() => remove(t.id)} className="ml-1">
               <X size={14} />
             </button>

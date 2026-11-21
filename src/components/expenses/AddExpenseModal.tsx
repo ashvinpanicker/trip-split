@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { Calendar, Check, UserPlus, X } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
-import { calculateEqualSplits, calculatePercentageSplits } from '@/lib/utils/balance';
+import { createClient, getAuthUser } from '@/lib/supabase/client';
+import { computeShares as computeSharesFor, validateSplit, itemizedShares, CATEGORIES, currencySymbol, formatCurrency, getActiveCurrency, shortName } from '@/lib/utils/balance';
+import ItemizedEditor, { type DraftBill } from './ItemizedEditor';
 import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
@@ -22,7 +23,10 @@ interface AddExpenseModalProps {
     title: string;
     amount: number;
     date: string;
-    paid_by: string;
+    paid_by: string | null;
+    paid_by_pending?: string | null;
+    category?: string | null;
+    items?: { items: { name: string; price: number; people: string[] }[]; extra: number } | null;
     split_type: SplitType;
     notes: string | null;
     participants: { user_id: string | null; pending_member_id: string | null; share_amount: number; share_percentage: number | null }[];
@@ -39,6 +43,9 @@ export default function AddExpenseModal({
   const [step, setStep] = useState<'group' | 'form'>(initialGroupId ? 'form' : 'group');
   const [groups, setGroups] = useState<Group[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(initialGroupId);
+  // Money in this form uses the chosen group's currency (falls back to the one on screen)
+  const cur = groups.find((g) => g.id === selectedGroupId)?.currency || getActiveCurrency();
+  const sym = currencySymbol(cur);
   const [currentUserId, setCurrentUserId] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -46,9 +53,18 @@ export default function AddExpenseModal({
   const [title, setTitle] = useState(expense?.title ?? '');
   const [amount, setAmount] = useState(expense?.amount?.toString() ?? '');
   const [date, setDate] = useState(expense?.date ?? format(new Date(), 'yyyy-MM-dd'));
-  const [paidBy, setPaidBy] = useState(expense?.paid_by ?? '');
+  const [paidBy, setPaidBy] = useState(expense?.paid_by ?? expense?.paid_by_pending ?? '');
+  const [category, setCategory] = useState(expense?.category ?? 'food');
   const [splitType, setSplitType] = useState<SplitType>(expense?.split_type ?? 'equal');
   const [notes, setNotes] = useState(expense?.notes ?? '');
+  // Itemized bill mode (saved as an exact split, with the items kept for re-editing)
+  const [itemMode, setItemMode] = useState(!!expense?.items);
+  const emptyBill = (): DraftBill => ({ items: [{ name: '', price: '', people: [] }], extra: '' });
+  const [bill, setBill] = useState<DraftBill>(
+    expense?.items
+      ? { items: expense.items.items.map((i) => ({ name: i.name, price: String(i.price), people: i.people })), extra: expense.items.extra ? String(expense.items.extra) : '' }
+      : emptyBill()
+  );
   const [participants, setParticipants] = useState<ParticipantEntry[]>([]);
 
   // Add person inline
@@ -59,14 +75,14 @@ export default function AddExpenseModal({
   useEffect(() => {
     if (!open) return;
     async function init() {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getAuthUser(supabase);
       if (!user) return;
       setCurrentUserId(user.id);
 
       if (!initialGroupId) {
         const { data } = await supabase
           .from('group_members')
-          .select('group:groups(id, name, description, invite_code, created_at, updated_at, created_by)')
+          .select('group:groups(id, name, description, invite_code, currency, created_at, updated_at, created_by)')
           .eq('user_id', user.id);
         if (data) setGroups(data.map((d: any) => d.group).filter(Boolean));
       }
@@ -74,8 +90,10 @@ export default function AddExpenseModal({
     init();
   }, [open, initialGroupId]);
 
+  // Reload every time the sheet opens — the list can change (new names, people joining)
+  // and the first load can race the auth session and come back empty.
   useEffect(() => {
-    if (!selectedGroupId) return;
+    if (!open || !selectedGroupId) return;
     async function loadParticipants() {
       const { data: memberData } = await supabase
         .from('group_members')
@@ -99,7 +117,7 @@ export default function AddExpenseModal({
           id: m.user_id,
           name: p?.full_name || p?.email || 'Unknown',
           avatar_url: p?.avatar_url,
-          included: existing ? true : true,
+          included: expense ? !!existing : true,
           amount: existing ? existing.share_amount.toString() : '',
           percentage: existing?.share_percentage?.toString() ?? '',
         });
@@ -112,7 +130,7 @@ export default function AddExpenseModal({
           type: 'pending',
           id: pm.id,
           name: pm.name,
-          included: !!existing,
+          included: expense ? !!existing : true,
           amount: existing ? existing.share_amount.toString() : '',
           percentage: existing?.share_percentage?.toString() ?? '',
         });
@@ -122,7 +140,7 @@ export default function AddExpenseModal({
       if (!paidBy && currentUserId) setPaidBy(currentUserId);
     }
     loadParticipants();
-  }, [selectedGroupId, currentUserId, expense]);
+  }, [open, selectedGroupId, currentUserId, expense]);
 
   function toggleParticipant(key: string) {
     setParticipants((prev) =>
@@ -140,40 +158,36 @@ export default function AddExpenseModal({
     return participants.filter((p) => p.included);
   }
 
-  function computeShares(): Record<string, number> {
-    const included = getIncluded();
-    const total = parseFloat(amount) || 0;
-    if (!total || !included.length) return {};
+  function splitEntries() {
+    return getIncluded().map((p) => ({ key: p.key, percentage: p.percentage, amount: p.amount }));
+  }
 
-    if (splitType === 'equal') {
-      return calculateEqualSplits(total, included.map((p) => p.key));
+  function billResult() {
+    return itemizedShares(
+      bill.items.map((i) => ({ name: i.name.trim(), price: parseFloat(i.price) || 0, people: i.people })),
+      parseFloat(bill.extra) || 0
+    );
+  }
+
+  function computeShares(): Record<string, number> {
+    if (itemMode) {
+      // itemizedShares works in person ids; the form keys people by p.key
+      const byId = billResult().shares;
+      return Object.fromEntries(participants.filter((p) => byId[p.id] !== undefined).map((p) => [p.key, byId[p.id]]));
     }
-    if (splitType === 'percentage') {
-      const pcts: Record<string, number> = {};
-      for (const p of included) pcts[p.key] = parseFloat(p.percentage) || 0;
-      return calculatePercentageSplits(total, pcts);
-    }
-    const shares: Record<string, number> = {};
-    for (const p of included) shares[p.key] = parseFloat(p.amount) || 0;
-    return shares;
+    return computeSharesFor(splitType, parseFloat(amount) || 0, splitEntries());
   }
 
   function validate(): string | null {
     if (!title.trim()) return 'Enter a title';
-    const amt = parseFloat(amount);
-    if (!amt || amt <= 0) return 'Enter a valid amount';
     if (!paidBy) return 'Select who paid';
-    const included = getIncluded();
-    if (!included.length) return 'Select at least one participant';
-    if (splitType === 'percentage') {
-      const total = included.reduce((s, p) => s + (parseFloat(p.percentage) || 0), 0);
-      if (Math.abs(total - 100) > 0.5) return `Percentages must add up to 100% (currently ${total.toFixed(1)}%)`;
+    if (itemMode) {
+      if (!bill.items.some((i) => (parseFloat(i.price) || 0) > 0 && i.people.length)) return 'Add at least one item with a price and who had it';
+      if (bill.items.some((i) => (parseFloat(i.price) || 0) > 0 && !i.people.length)) return 'Every item needs at least one person';
+      const shares = computeShares();
+      return validateSplit('fixed', billResult().total, Object.entries(shares).map(([key, amount]) => ({ key, amount })));
     }
-    if (splitType === 'fixed') {
-      const total = Object.values(computeShares()).reduce((s, v) => s + v, 0);
-      if (Math.abs(total - amt) > 0.01) return `Amounts must add up to ₹${amt.toFixed(2)} (currently ₹${total.toFixed(2)})`;
-    }
-    return null;
+    return validateSplit(splitType, parseFloat(amount) || 0, splitEntries());
   }
 
   async function addNewPerson() {
@@ -214,49 +228,44 @@ export default function AddExpenseModal({
 
     setLoading(true);
     const shares = computeShares();
-    const included = getIncluded();
+    const included = itemMode ? participants.filter((p) => shares[p.key] !== undefined) : getIncluded();
+    const total = itemMode ? billResult().total : parseFloat(amount);
 
     try {
+      const payer = participants.find((p) => p.id === paidBy);
+      const payerFields = payer?.type === 'pending'
+        ? { paid_by: null, paid_by_pending: paidBy }
+        : { paid_by: paidBy, paid_by_pending: null };
+
       const participantsData = included.map((p) => ({
         user_id: p.type === 'user' ? p.id : null,
         pending_member_id: p.type === 'pending' ? p.id : null,
         share_amount: shares[p.key],
-        share_percentage: splitType === 'percentage' ? parseFloat(p.percentage) || null : null,
+        share_percentage: !itemMode && splitType === 'percentage' ? parseFloat(p.percentage) || null : null,
       }));
 
-      if (isEditing && expense) {
-        const { error: expErr } = await supabase
-          .from('expenses')
-          .update({ title, amount: parseFloat(amount), date, paid_by: paidBy, split_type: splitType, notes: notes || null })
-          .eq('id', expense.id);
-        if (expErr) throw expErr;
-
-        await supabase.from('expense_participants').delete().eq('expense_id', expense.id);
-        const { error: partErr } = await supabase.from('expense_participants').insert(
-          participantsData.map((p) => ({ ...p, expense_id: expense.id }))
-        );
-        if (partErr) throw partErr;
-        toast('Expense updated');
-      } else {
-        const { data: { user } } = await supabase.auth.getUser();
-        const { data: expData, error: expErr } = await supabase
-          .from('expenses')
-          .insert({
-            group_id: selectedGroupId,
-            title, amount: parseFloat(amount), date,
-            paid_by: paidBy, split_type: splitType,
-            notes: notes || null, created_by: user!.id,
-          })
-          .select('id')
-          .single();
-        if (expErr) throw expErr;
-
-        const { error: partErr } = await supabase.from('expense_participants').insert(
-          participantsData.map((p) => ({ ...p, expense_id: expData.id }))
-        );
-        if (partErr) throw partErr;
-        toast('Expense added');
-      }
+      // One atomic call: expense + split saved together, and the DB rejects splits that don't add up
+      const { error } = await supabase.rpc('save_expense', {
+        p_expense_id: isEditing && expense ? expense.id : null,
+        p_group_id: selectedGroupId,
+        p_title: title.trim(),
+        p_amount: total,
+        p_date: date,
+        p_paid_by: payerFields.paid_by,
+        p_paid_by_pending: payerFields.paid_by_pending,
+        p_category: category,
+        p_split_type: itemMode ? 'fixed' : splitType,
+        p_notes: notes || null,
+        p_participants: participantsData,
+        p_items: itemMode
+          ? {
+              items: bill.items.filter((i) => (parseFloat(i.price) || 0) > 0).map((i) => ({ name: i.name.trim(), price: parseFloat(i.price), people: i.people })),
+              extra: parseFloat(bill.extra) || 0,
+            }
+          : null,
+      });
+      if (error) throw error;
+      toast(isEditing ? 'Expense updated' : 'Expense added');
 
       onSuccess?.();
       onClose();
@@ -270,13 +279,13 @@ export default function AddExpenseModal({
 
   function resetForm() {
     setTitle(''); setAmount(''); setDate(format(new Date(), 'yyyy-MM-dd'));
-    setPaidBy(''); setSplitType('equal'); setNotes('');
+    setPaidBy(''); setSplitType('equal'); setNotes(''); setCategory('food');
+    setItemMode(false); setBill(emptyBill());
     setParticipants([]); setShowAddPerson(false); setNewPersonName('');
     if (!initialGroupId) { setStep('group'); setSelectedGroupId(null); }
   }
 
   const shares = computeShares();
-  const realMembers = participants.filter((p) => p.type === 'user');
 
   // ── Group picker step ──────────────────────────────────────
   if (step === 'group') {
@@ -319,12 +328,14 @@ export default function AddExpenseModal({
 
         <div className="grid grid-cols-2 gap-3">
           <Input
-            label="Amount (₹)"
+            label={`Amount (${sym})`}
             type="number"
+            inputMode="decimal"
             placeholder="0.00"
-            value={amount}
+            value={itemMode ? (billResult().total ? billResult().total.toFixed(2) : '') : amount}
             onChange={(e) => setAmount(e.target.value)}
-            leftIcon={<span className="text-sm font-medium">₹</span>}
+            readOnly={itemMode}
+            leftIcon={<span className="text-sm font-medium">{sym}</span>}
             min="0.01"
             step="0.01"
             required
@@ -339,11 +350,30 @@ export default function AddExpenseModal({
           />
         </div>
 
-        {/* Paid by — only real members can be payer */}
+        {/* Category */}
+        <div>
+          <label className="text-sm font-medium text-gray-700 mb-2 block">Category</label>
+          <div className="flex gap-2 overflow-x-auto -mx-4 px-4 pb-1 no-scrollbar">
+            {CATEGORIES.map((c) => (
+              <button
+                key={c.key}
+                type="button"
+                onClick={() => setCategory(c.key)}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-full border text-sm whitespace-nowrap transition-colors ${
+                  category === c.key ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200'
+                }`}
+              >
+                <span>{c.emoji}</span>{c.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Paid by — anyone in the group, including people who haven't signed up */}
         <div>
           <label className="text-sm font-medium text-gray-700 mb-2 block">Paid by</label>
           <div className="flex gap-2 flex-wrap">
-            {realMembers.map((m) => (
+            {participants.map((m) => (
               <button
                 key={m.key}
                 type="button"
@@ -355,7 +385,7 @@ export default function AddExpenseModal({
                 }`}
               >
                 <Avatar src={m.avatar_url} name={m.name} size="xs" />
-                {m.name.split(' ')[0]}
+                {m.id === currentUserId ? 'You' : shortName(m.name, participants.map((x) => x.name))}
               </button>
             ))}
           </div>
@@ -369,24 +399,62 @@ export default function AddExpenseModal({
               <button
                 key={type}
                 type="button"
-                onClick={() => setSplitType(type)}
-                className={`flex-1 py-2 rounded-xl border text-sm font-medium capitalize transition-colors ${
-                  splitType === type
+                onClick={() => { setSplitType(type); setItemMode(false); }}
+                className={`flex-1 min-w-0 py-2 rounded-xl border text-sm font-medium capitalize transition-colors ${
+                  !itemMode && splitType === type
                     ? 'bg-blue-600 text-white border-blue-600'
                     : 'bg-white text-gray-700 border-gray-200'
                 }`}
               >
-                {type}
+                {type === 'percentage' ? '%' : type === 'fixed' ? 'Exact' : 'Equal'}
               </button>
             ))}
+            <button
+              type="button"
+              onClick={() => {
+                setItemMode(true);
+                // New items default to everyone on the trip
+                setBill((b) => b.items.length === 1 && !b.items[0].name && !b.items[0].price
+                  ? { ...b, items: [{ name: '', price: '', people: participants.map((p) => p.id) }] } : b);
+              }}
+              className={`flex-1 min-w-0 py-2 rounded-xl border text-sm font-medium transition-colors ${
+                itemMode ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200'
+              }`}
+            >
+              Items
+            </button>
           </div>
         </div>
 
         {/* Participants */}
+        {itemMode ? (
+          <div>
+            <label className="text-sm font-medium text-gray-700 mb-2 block">Items on the bill</label>
+            <ItemizedEditor
+              people={participants.map((p) => ({ id: p.id, name: p.id === currentUserId ? `${p.name} (you)` : p.name }))}
+              bill={bill}
+              onChange={setBill}
+              currency={cur}
+              symbol={sym}
+            />
+          </div>
+        ) : (
         <div>
-          <label className="text-sm font-medium text-gray-700 mb-2 block">
-            Participants ({getIncluded().length}/{participants.length})
-          </label>
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-sm font-medium text-gray-700">
+              Split between ({getIncluded().length}/{participants.length})
+            </label>
+            <button
+              type="button"
+              onClick={() => {
+                const all = participants.every((p) => p.included);
+                setParticipants((prev) => prev.map((p) => ({ ...p, included: !all })));
+              }}
+              className="text-xs font-medium text-blue-600"
+            >
+              {participants.every((p) => p.included) ? 'Select none' : 'Select all'}
+            </button>
+          </div>
           <div className="space-y-2">
             {participants.map((p) => {
               const share = shares[p.key];
@@ -424,7 +492,7 @@ export default function AddExpenseModal({
                   )}
                   {p.included && splitType === 'fixed' && (
                     <div className="flex items-center gap-1">
-                      <span className="text-gray-500 text-sm">₹</span>
+                      <span className="text-gray-500 text-sm">{sym}</span>
                       <input
                         type="number"
                         value={p.amount}
@@ -436,7 +504,7 @@ export default function AddExpenseModal({
                     </div>
                   )}
                   {p.included && splitType === 'equal' && share !== undefined && (
-                    <span className="text-sm text-gray-500">₹{share.toFixed(2)}</span>
+                    <span className="text-sm text-gray-500">{formatCurrency(share, cur)}</span>
                   )}
                   {!p.included && <span className="text-xs text-gray-400">Excluded</span>}
                 </div>
@@ -452,7 +520,7 @@ export default function AddExpenseModal({
                   onChange={(e) => setNewPersonName(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addNewPerson())}
                   placeholder="Their name (e.g. Priya)"
-                  className="flex-1 bg-transparent text-sm outline-none text-gray-900 placeholder:text-gray-400"
+                  className="flex-1 min-w-0 bg-transparent text-sm outline-none text-gray-900 placeholder:text-gray-400"
                   autoFocus
                 />
                 <button
@@ -478,11 +546,12 @@ export default function AddExpenseModal({
                 className="flex items-center gap-2 w-full p-2.5 rounded-xl border border-dashed border-gray-300 text-gray-500 text-sm hover:border-blue-400 hover:text-blue-600 transition-colors"
               >
                 <UserPlus size={14} />
-                Add person who hasn&apos;t joined yet
+                Add someone (no account needed)
               </button>
             )}
           </div>
         </div>
+        )}
 
         <Input
           label="Notes (optional)"

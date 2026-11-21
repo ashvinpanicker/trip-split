@@ -2,6 +2,9 @@
 
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import GroupKindPicker from './GroupKindPicker';
+import type { GroupKind } from '@/lib/utils/groupKinds';
+import CurrencySelect from './CurrencySelect';
 import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
@@ -18,6 +21,9 @@ export default function CreateGroupModal({ open, onClose, onSuccess }: CreateGro
   const supabase = createClient();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [currency, setCurrency] = useState('INR');
+  const [kind, setKind] = useState<GroupKind>('friends');
+  const [trackOnly, setTrackOnly] = useState(false);
   const [loading, setLoading] = useState(false);
 
   async function handleCreate(e: React.FormEvent) {
@@ -35,7 +41,7 @@ export default function CreateGroupModal({ open, onClose, onSuccess }: CreateGro
 
     const { error: groupErr } = await supabase
       .from('groups')
-      .insert({ id: groupId, name: name.trim(), description: description.trim() || null, created_by: user.id });
+      .insert({ id: groupId, name: name.trim(), description: description.trim() || null, currency, kind, track_only: trackOnly, created_by: user.id });
 
     if (groupErr) {
       toast(groupErr.message, 'error');
@@ -66,7 +72,7 @@ export default function CreateGroupModal({ open, onClose, onSuccess }: CreateGro
       <form onSubmit={handleCreate} className="p-4 space-y-4">
         <Input
           label="Group name"
-          placeholder="e.g. Goa Trip 2025"
+          placeholder="e.g. Bhutan with family"
           value={name}
           onChange={(e) => setName(e.target.value)}
           required
@@ -78,6 +84,8 @@ export default function CreateGroupModal({ open, onClose, onSuccess }: CreateGro
           value={description}
           onChange={(e) => setDescription(e.target.value)}
         />
+        <GroupKindPicker kind={kind} trackOnly={trackOnly} onKind={setKind} onTrackOnly={setTrackOnly} />
+        <CurrencySelect value={currency} onChange={setCurrency} />
         <div className="flex gap-3">
           <Button type="button" variant="secondary" fullWidth onClick={onClose}>Cancel</Button>
           <Button type="submit" fullWidth loading={loading}>Create</Button>

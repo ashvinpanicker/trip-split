@@ -2,22 +2,29 @@
 
 import { useState } from 'react';
 import { format } from 'date-fns';
-import { MoreVertical, Edit2, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { MoreVertical, Edit2, Trash2, ChevronDown, ChevronUp, Paperclip } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import Avatar from '@/components/ui/Avatar';
 import { useToast } from '@/components/ui/Toast';
-import { formatCurrency } from '@/lib/utils/balance';
+import { formatCurrency, categoryOf, payerIdOf } from '@/lib/utils/balance';
 import type { Expense } from '@/types';
 import AddExpenseModal from './AddExpenseModal';
+import ReceiptPhoto from './ReceiptPhoto';
+import { groupColor, type GroupColor } from '@/lib/utils/groupColor';
 
 interface ExpenseCardProps {
   expense: Expense;
   currentUserId: string;
   onDelete?: () => void;
   onUpdate?: () => void;
+  /** Override the display currency (e.g. on the dashboard, where groups differ) */
+  currency?: string;
+  /** Show which trip this is from (dashboard, when you're in several) */
+  group?: { id: string; name: string; color?: GroupColor };
 }
 
-export default function ExpenseCard({ expense, currentUserId, onDelete, onUpdate }: ExpenseCardProps) {
+export default function ExpenseCard({ expense, currentUserId, onDelete, onUpdate, currency, group }: ExpenseCardProps) {
+  const gc = group ? group.color ?? groupColor(group.id) : null;
   const { toast } = useToast();
   const supabase = createClient();
   const [expanded, setExpanded] = useState(false);
@@ -26,8 +33,12 @@ export default function ExpenseCard({ expense, currentUserId, onDelete, onUpdate
   const [deleting, setDeleting] = useState(false);
 
   const payer = expense.payer as any;
-  const payerName = payer?.full_name || payer?.email || 'Unknown';
+  const payerName = payer?.id === currentUserId
+    ? 'You'
+    : payer?.full_name || payer?.email || expense.payer_pending?.name || 'Unknown';
+  const payerId = payerIdOf(expense);
   const isMyExpense = expense.paid_by === currentUserId;
+  const cat = categoryOf(expense.category);
 
   const myParticipation = expense.participants?.find((p) => p.user_id === currentUserId);
   const myShare = myParticipation?.share_amount ?? 0;
@@ -35,6 +46,7 @@ export default function ExpenseCard({ expense, currentUserId, onDelete, onUpdate
   async function handleDelete() {
     if (!confirm('Delete this expense?')) return;
     setDeleting(true);
+    if (expense.receipt_path) await supabase.storage.from('receipts').remove([expense.receipt_path]);
     const { error } = await supabase.from('expenses').delete().eq('id', expense.id);
     if (error) {
       toast('Failed to delete expense', 'error');
@@ -52,8 +64,11 @@ export default function ExpenseCard({ expense, currentUserId, onDelete, onUpdate
     amount: expense.amount,
     date: expense.date,
     paid_by: expense.paid_by,
+    paid_by_pending: expense.paid_by_pending,
+    category: expense.category,
     split_type: expense.split_type,
     notes: expense.notes,
+    items: expense.items ?? null,
     participants: (expense.participants || []).map((p) => ({
       user_id: p.user_id,
       pending_member_id: p.pending_member_id,
@@ -64,26 +79,35 @@ export default function ExpenseCard({ expense, currentUserId, onDelete, onUpdate
 
   return (
     <>
-      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden" style={gc ? { borderLeft: `4px solid ${gc.dot}` } : undefined}>
         <div className="flex items-start gap-3 p-4">
           <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center flex-shrink-0">
-            <span className="text-lg">🧾</span>
+            <span className="text-lg">{cat.emoji}</span>
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
+                {group && gc && (
+                  <span
+                    className="inline-flex max-w-[11rem] items-center gap-1 rounded-full px-2 py-0.5 mb-1 text-[11px] font-semibold"
+                    style={{ background: gc.bg, color: gc.fg }}
+                  >
+                    <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: gc.dot }} aria-hidden />
+                    <span className="truncate">{group.name}</span>
+                  </span>
+                )}
                 <p className="font-semibold text-gray-900 truncate">{expense.title}</p>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  {format(new Date(expense.date), 'MMM d, yyyy')} · {payerName} paid
+                  {format(new Date(expense.date), 'MMM d')} · {payerName} paid
                 </p>
               </div>
               <div className="flex items-center gap-1 flex-shrink-0">
                 <div className="text-right">
-                  <p className="font-bold text-gray-900">{formatCurrency(expense.amount)}</p>
+                  <p className="font-bold text-gray-900">{formatCurrency(expense.amount, currency)}</p>
                   {isMyExpense ? (
                     <p className="text-xs text-green-600 font-medium">you paid</p>
                   ) : myShare > 0 ? (
-                    <p className="text-xs text-red-500 font-medium">you owe {formatCurrency(myShare)}</p>
+                    <p className="text-xs text-red-500 font-medium">you owe {formatCurrency(myShare, currency)}</p>
                   ) : null}
                 </div>
                 <div className="relative">
@@ -126,31 +150,47 @@ export default function ExpenseCard({ expense, currentUserId, onDelete, onUpdate
               className="flex items-center gap-1 mt-2 text-xs text-blue-600"
             >
               {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-              {expense.participants?.length || 0} participants · {expense.split_type} split
+              {expense.participants?.length || 0} participants · {expense.items ? 'itemized bill' : `${expense.split_type} split`}
+              {expense.receipt_path && <Paperclip size={12} className="ml-1" />}
             </button>
           </div>
         </div>
 
-        {expanded && expense.participants && expense.participants.length > 0 && (
+        {expanded && (
           <div className="px-4 pb-4 border-t border-gray-50 pt-3">
+            {expense.items && expense.items.items.length > 0 && (
+              <div className="mb-3 space-y-1 text-xs text-gray-500">
+                {expense.items.items.map((it, i) => (
+                  <div key={i} className="flex justify-between gap-2">
+                    <span className="truncate">{it.name || 'Item'} · {it.people.length} {it.people.length === 1 ? 'person' : 'people'}</span>
+                    <span>{formatCurrency(it.price, currency)}</span>
+                  </div>
+                ))}
+                {expense.items.extra !== 0 && (
+                  <div className="flex justify-between"><span>Tax / service / tip</span><span>{formatCurrency(expense.items.extra, currency)}</span></div>
+                )}
+              </div>
+            )}
             <div className="space-y-2">
-              {expense.participants.map((p) => {
+              {(expense.participants ?? []).map((p) => {
                 const profile = p.profile as any;
-                const name = profile?.full_name || profile?.email || 'Unknown';
+                const name = profile?.full_name || profile?.email || p.pending_member?.name || 'Unknown';
+                const pid = p.user_id ?? p.pending_member_id;
                 return (
-                  <div key={p.user_id} className="flex items-center justify-between">
+                  <div key={pid ?? p.id} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Avatar src={profile?.avatar_url} name={name} size="xs" />
                       <span className="text-sm text-gray-700">{name}</span>
-                      {p.user_id === expense.paid_by && (
+                      {pid === payerId && (
                         <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">paid</span>
                       )}
                     </div>
-                    <span className="text-sm font-medium text-gray-900">{formatCurrency(p.share_amount)}</span>
+                    <span className="text-sm font-medium text-gray-900">{formatCurrency(p.share_amount, currency)}</span>
                   </div>
                 );
               })}
             </div>
+            <ReceiptPhoto expenseId={expense.id} groupId={expense.group_id} path={expense.receipt_path} onChange={onUpdate} />
           </div>
         )}
       </div>
