@@ -90,6 +90,7 @@ supabase/pay_methods.sql
 supabase/group_types.sql
 supabase/archive.sql
 supabase/balance_links.sql
+supabase/multi_currency.sql
 ```
 
 Under **Authentication → URL Configuration**, set your site URL and add `https://YOUR-DOMAIN/api/auth/callback**` as a redirect URL. Enable Google under **Providers** if you want one-tap sign-in.

@@ -69,6 +69,7 @@ export default function ExpenseCard({ expense, currentUserId, onDelete, onUpdate
     split_type: expense.split_type,
     notes: expense.notes,
     items: expense.items ?? null,
+    fx: expense.fx ?? null,
     participants: (expense.participants || []).map((p) => ({
       user_id: p.user_id,
       pending_member_id: p.pending_member_id,
@@ -104,6 +105,7 @@ export default function ExpenseCard({ expense, currentUserId, onDelete, onUpdate
               <div className="flex items-center gap-1 flex-shrink-0">
                 <div className="text-right">
                   <p className="font-bold text-gray-900">{formatCurrency(expense.amount, currency)}</p>
+                  {expense.fx && <p className="text-xs text-gray-500">{formatCurrency(expense.fx.amount, expense.fx.currency)}</p>}
                   {isMyExpense ? (
                     <p className="text-xs text-green-600 font-medium">you paid</p>
                   ) : myShare > 0 ? (
@@ -163,11 +165,11 @@ export default function ExpenseCard({ expense, currentUserId, onDelete, onUpdate
                 {expense.items.items.map((it, i) => (
                   <div key={i} className="flex justify-between gap-2">
                     <span className="truncate">{it.name || 'Item'} · {it.people.length} {it.people.length === 1 ? 'person' : 'people'}</span>
-                    <span>{formatCurrency(it.price, currency)}</span>
+                    <span>{formatCurrency(it.price, expense.fx?.currency ?? currency)}</span>
                   </div>
                 ))}
                 {expense.items.extra !== 0 && (
-                  <div className="flex justify-between"><span>Tax / service / tip</span><span>{formatCurrency(expense.items.extra, currency)}</span></div>
+                  <div className="flex justify-between"><span>Tax / service / tip</span><span>{formatCurrency(expense.items.extra, expense.fx?.currency ?? currency)}</span></div>
                 )}
               </div>
             )}

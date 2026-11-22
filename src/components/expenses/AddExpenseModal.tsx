@@ -4,13 +4,14 @@ import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { Calendar, Check, UserPlus, X } from 'lucide-react';
 import { createClient, getAuthUser } from '@/lib/supabase/client';
-import { computeShares as computeSharesFor, validateSplit, itemizedShares, CATEGORIES, currencySymbol, formatCurrency, getActiveCurrency, shortName } from '@/lib/utils/balance';
+import { computeShares as computeSharesFor, validateSplit, itemizedShares, CATEGORIES, CURRENCIES, currencySymbol, formatCurrency, getActiveCurrency, shortName } from '@/lib/utils/balance';
 import ItemizedEditor, { type DraftBill } from './ItemizedEditor';
 import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import Avatar from '@/components/ui/Avatar';
 import { useAdvanced } from '@/hooks/useAdvanced';
+import { convertSplit, fetchRate, peggedRate, readTripRates } from '@/lib/utils/fx';
 import { useToast } from '@/components/ui/Toast';
 import type { Group, ParticipantEntry, SplitType } from '@/types';
 
@@ -28,6 +29,7 @@ interface AddExpenseModalProps {
     paid_by_pending?: string | null;
     category?: string | null;
     items?: { items: { name: string; price: number; people: string[] }[]; extra: number } | null;
+    fx?: { currency: string; amount: number; rate: number } | null;
     split_type: SplitType;
     notes: string | null;
     participants: { user_id: string | null; pending_member_id: string | null; share_amount: number; share_percentage: number | null }[];
@@ -46,13 +48,23 @@ export default function AddExpenseModal({
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(initialGroupId);
   // Money in this form uses the chosen group's currency (falls back to the one on screen)
   const cur = groups.find((g) => g.id === selectedGroupId)?.currency || getActiveCurrency();
-  const sym = currencySymbol(cur);
+  // Paid in another currency? Shares are entered in that currency and converted to `cur` on save
+  const fx0 = expense?.fx ?? null;
+  const [payCur, setPayCur] = useState<string>(fx0?.currency ?? '');
+  const foreign = !!payCur && payCur !== cur;
+  const effCur = foreign ? payCur : cur;
+  const sym = currencySymbol(effCur);
+  const [fxOk, setFxOk] = useState(false); // multi-currency is set up in the database
+  const [tripRates, setTripRates] = useState<Record<string, number>>({});
+  const [rate, setRate] = useState(fx0 ? String(fx0.rate) : '');
+  const [rateNote, setRateNote] = useState('');
+  const [keepRate, setKeepRate] = useState(false);
   const [currentUserId, setCurrentUserId] = useState('');
   const [loading, setLoading] = useState(false);
 
   // Form
   const [title, setTitle] = useState(expense?.title ?? '');
-  const [amount, setAmount] = useState(expense?.amount?.toString() ?? '');
+  const [amount, setAmount] = useState((expense?.fx?.amount ?? expense?.amount)?.toString() ?? '');
   const [date, setDate] = useState(expense?.date ?? format(new Date(), 'yyyy-MM-dd'));
   const [paidBy, setPaidBy] = useState(expense?.paid_by ?? expense?.paid_by_pending ?? '');
   const [category, setCategory] = useState(expense?.category ?? 'food');
@@ -123,7 +135,7 @@ export default function AddExpenseModal({
           name: p?.full_name || p?.email || 'Unknown',
           avatar_url: p?.avatar_url,
           included: expense ? !!existing : true,
-          amount: existing ? existing.share_amount.toString() : '',
+          amount: existing ? (fx0 ? +(existing.share_amount / fx0.rate).toFixed(2) : existing.share_amount).toString() : '',
           percentage: existing?.share_percentage?.toString() ?? '',
         });
       }
@@ -136,7 +148,7 @@ export default function AddExpenseModal({
           id: pm.id,
           name: pm.name,
           included: expense ? !!existing : true,
-          amount: existing ? existing.share_amount.toString() : '',
+          amount: existing ? (fx0 ? +(existing.share_amount / fx0.rate).toFixed(2) : existing.share_amount).toString() : '',
           percentage: existing?.share_percentage?.toString() ?? '',
         });
       }
@@ -146,6 +158,33 @@ export default function AddExpenseModal({
     }
     loadParticipants();
   }, [open, selectedGroupId, currentUserId, expense]);
+
+  useEffect(() => {
+    if (!open || !selectedGroupId) return;
+    supabase.from('groups').select('fx_rates').eq('id', selectedGroupId).single().then(({ data, error }) => {
+      setFxOk(!error);
+      if (!error) setTripRates(readTripRates((data as any)?.fx_rates));
+    });
+    if (!expense) {
+      try { setPayCur(localStorage.getItem(`tripsplit:paycur:${selectedGroupId}`) || ''); } catch {}
+    }
+  }, [open, selectedGroupId]);
+
+  // Rate for the paid currency: the trip's fixed rate, else pegged, else that day's market rate
+  useEffect(() => {
+    if (!foreign) { setRateNote(''); return; }
+    if (fx0 && fx0.currency === payCur && rate) { setRateNote('Rate saved with this expense'); return; }
+    const fixed = tripRates[payCur];
+    if (fixed) { setRate(String(fixed)); setRateNote('Trip rate'); return; }
+    let live = true;
+    setRateNote('Getting today\u2019s rate…');
+    fetchRate(payCur, cur, date).then((r) => {
+      if (!live) return;
+      if (r) { setRate(String(+r.toPrecision(6))); setRateNote(peggedRate(payCur, cur) ? 'Fixed by law' : `Market rate for ${date}`); }
+      else setRateNote('Couldn\u2019t get a rate. Enter the one you got.');
+    });
+    return () => { live = false; };
+  }, [payCur, cur, date, tripRates]);
 
   function toggleParticipant(key: string) {
     setParticipants((prev) =>
@@ -242,10 +281,14 @@ export default function AddExpenseModal({
         ? { paid_by: null, paid_by_pending: paidBy }
         : { paid_by: paidBy, paid_by_pending: null };
 
-      const participantsData = included.map((p) => ({
+      const fxRate = foreign ? parseFloat(rate) : 1;
+      if (foreign && !(fxRate > 0)) throw new Error(`Enter the ${payCur} to ${cur} rate`);
+      // Balances stay in the trip currency: convert the total and every share (they still add up exactly)
+      const conv = convertSplit(total, included.map((p) => shares[p.key]), fxRate);
+      const participantsData = included.map((p, k) => ({
         user_id: p.type === 'user' ? p.id : null,
         pending_member_id: p.type === 'pending' ? p.id : null,
-        share_amount: shares[p.key],
+        share_amount: conv.shares[k],
         share_percentage: !itemMode && splitType === 'percentage' ? parseFloat(p.percentage) || null : null,
       }));
 
@@ -254,7 +297,7 @@ export default function AddExpenseModal({
         p_expense_id: isEditing && expense ? expense.id : null,
         p_group_id: selectedGroupId,
         p_title: title.trim(),
-        p_amount: total,
+        p_amount: conv.amount,
         p_date: date,
         p_paid_by: payerFields.paid_by,
         p_paid_by_pending: payerFields.paid_by_pending,
@@ -268,8 +311,11 @@ export default function AddExpenseModal({
               extra: parseFloat(bill.extra) || 0,
             }
           : null,
+        ...(foreign ? { p_fx: { currency: payCur, amount: total, rate: fxRate } } : {}),
       });
       if (error) throw error;
+      if (foreign && keepRate) await supabase.rpc('set_trip_rate', { p_group_id: selectedGroupId, p_currency: payCur, p_rate: fxRate });
+      try { localStorage.setItem(`tripsplit:paycur:${selectedGroupId}`, foreign ? payCur : ''); } catch {}
       toast(isEditing ? 'Expense updated' : 'Expense added');
 
       onSuccess?.();
@@ -354,6 +400,45 @@ export default function AddExpenseModal({
             required
           />
         </div>
+
+        {fxOk && (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-sm">
+              <label htmlFor="paycur" className="text-gray-700">Paid in</label>
+              <select
+                id="paycur"
+                value={effCur}
+                onChange={(e) => { setPayCur(e.target.value === cur ? '' : e.target.value); setKeepRate(false); if (fx0?.currency !== e.target.value) setRate(''); }}
+                className="h-9 rounded-lg border border-gray-200 bg-white px-2 text-gray-900"
+              >
+                {CURRENCIES.map((c) => <option key={c.code} value={c.code}>{c.code} · {c.label}</option>)}
+              </select>
+            </div>
+            {foreign && (
+              <div className="rounded-xl bg-gray-50 p-3 space-y-2">
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-gray-700 whitespace-nowrap">1 {payCur} =</span>
+                  <input
+                    type="number" inputMode="decimal" step="any" min="0" aria-label={`${cur} per ${payCur}`}
+                    value={rate} onChange={(e) => { setRate(e.target.value); setRateNote('Your rate'); }}
+                    className="w-28 h-9 rounded-lg border border-gray-200 bg-white px-2 text-gray-900"
+                  />
+                  <span className="text-gray-700">{cur}</span>
+                  <span className="ml-auto text-gray-900 font-medium tabular-nums">
+                    {(() => { const t = itemMode ? billResult().total : parseFloat(amount); const r = parseFloat(rate); return t > 0 && r > 0 ? `≈ ${formatCurrency(t * r, cur)}` : ''; })()}
+                  </span>
+                </div>
+                {rateNote && <p className="text-xs text-gray-500">{rateNote}</p>}
+                {tripRates[payCur] !== parseFloat(rate) && parseFloat(rate) > 0 && (
+                  <label className="flex items-center gap-2 text-xs text-gray-600">
+                    <input type="checkbox" checked={keepRate} onChange={(e) => setKeepRate(e.target.checked)} />
+                    Use this rate for the whole trip (e.g. what your forex card gave you)
+                  </label>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Category */}
         <div>
@@ -448,7 +533,7 @@ export default function AddExpenseModal({
               people={participants.map((p) => ({ id: p.id, name: p.id === currentUserId ? `${p.name} (you)` : p.name }))}
               bill={bill}
               onChange={setBill}
-              currency={cur}
+              currency={effCur}
               symbol={sym}
             />
           </div>
@@ -518,7 +603,7 @@ export default function AddExpenseModal({
                     </div>
                   )}
                   {p.included && splitType === 'equal' && share !== undefined && (
-                    <span className="text-sm text-gray-500">{formatCurrency(share, cur)}</span>
+                    <span className="text-sm text-gray-500">{formatCurrency(share, effCur)}</span>
                   )}
                   {!p.included && <span className="text-xs text-gray-400">Excluded</span>}
                 </div>

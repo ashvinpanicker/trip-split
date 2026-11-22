@@ -65,6 +65,8 @@ export interface Expense {
   notes: string | null;
   /** Itemized bill (people are person ids), kept so the bill can be re-edited */
   items?: { items: { name: string; price: number; people: string[] }[]; extra: number } | null;
+  /** Paid in another currency: what was really paid, and the rate used to convert it */
+  fx?: { currency: string; amount: number; rate: number } | null;
   receipt_path?: string | null;
   created_by: string | null;
   created_at: string;
