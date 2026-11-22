@@ -6,6 +6,8 @@ import { useGroup } from '@/hooks/useGroups';
 import { useExpenses, useSettlements } from '@/hooks/useExpenses';
 import { calculateGroupBalances, directDebts, smartSettle, setActiveCurrency, type BalancePerson } from '@/lib/utils/balance';
 import type { Expense, ExpenseParticipant } from '@/types';
+import { readPayMethods, type PayMethod } from '@/lib/utils/payMethods';
+import { useUser } from '@/hooks/useUser';
 
 /** Printable settle-up statement for a trip (Save as PDF). */
 export default function StatementPage({ params }: { params: Promise<{ id: string }> }) {
@@ -13,6 +15,7 @@ export default function StatementPage({ params }: { params: Promise<{ id: string
   const { group, loading } = useGroup(id);
   const { expenses, loading: expLoading } = useExpenses(id);
   const { settlements: payments } = useSettlements(id);
+  const { user } = useUser();
 
   if (loading || expLoading || !group) {
     return <div className="max-w-3xl mx-auto p-6 space-y-3">{[1, 2, 3].map((i) => <div key={i} className="h-16 rounded-xl bg-gray-100 animate-pulse" />)}</div>;
@@ -28,5 +31,8 @@ export default function StatementPage({ params }: { params: Promise<{ id: string
   const direct = directDebts(exps, persons, payments);
   const plan = group.simplify_debts ? smartSettle(balances, direct) : direct;
 
-  return <Statement tripName={group.name} currency={currency} persons={persons} expenses={exps} payments={payments} plan={plan} />;
+  const payMethods: Record<string, PayMethod[]> = {};
+  for (const m of group.members || []) payMethods[m.user_id] = readPayMethods((m.profile as any)?.pay_methods, (m.profile as any)?.upi_id);
+
+  return <Statement tripName={group.name} currency={currency} persons={persons} expenses={exps} payments={payments} plan={plan} payMethods={payMethods} me={user?.id} />;
 }

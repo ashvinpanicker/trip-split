@@ -60,6 +60,7 @@ as $$
     'expenses', coalesce((
       select json_agg(json_build_object(
         'id', e.id, 'title', e.title, 'amount', e.amount, 'date', e.date, 'fx', e.fx,
+        'category', e.category, 'created_by', e.created_by,
         'paid_by', e.paid_by, 'paid_by_pending', e.paid_by_pending,
         'participants', (select json_agg(json_build_object('user_id', ep.user_id, 'pending_member_id', ep.pending_member_id, 'share_amount', ep.share_amount))
                          from expense_participants ep where ep.expense_id = e.id)

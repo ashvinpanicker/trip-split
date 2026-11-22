@@ -19,6 +19,7 @@ export default function Footer() {
           <Link href="/guides/split-holiday-trip-expenses" className="hover:text-[var(--blue)]">Holiday trip guide</Link>
           <Link href="/blog" className="hover:text-[var(--blue)]">Blog</Link>
           <Link href="/privacy" className="hover:text-[var(--blue)]">Privacy</Link>
+          <Link href="/feedback" className="hover:text-[var(--blue)]">Feedback</Link>
           <Link href="/terms" className="hover:text-[var(--blue)]">Terms</Link>
           <Link href="/#faq" className="hover:text-[var(--blue)]">FAQ</Link>
         </div>

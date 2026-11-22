@@ -4,12 +4,17 @@ import { format } from 'date-fns';
 import { Printer } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils/balance';
 import { statementRows } from '@/lib/utils/statement';
+import { tripStats } from '@/lib/utils/stats';
+import { payActions, type PayMethod } from '@/lib/utils/payMethods';
+import TripStatsPanel from '@/components/stats/TripStatsPanel';
+import SupportLinks from '@/components/SupportLinks';
 import type { Settlement } from '@/types';
 
 type Person = { id: string; name: string };
 type Exp = {
   id: string; title: string; date: string; amount: number;
   paid_by: string | null; paid_by_pending?: string | null;
+  category?: string | null; created_by?: string | null;
   fx?: { currency: string; amount: number; rate: number } | null;
   participants: { user_id: string | null; pending_member_id: string | null; share_amount: number }[];
 };
@@ -20,13 +25,18 @@ type Pay = { from_person: string; to_person: string; amount: number; date?: stri
  * every expense and how it was split, payments made, and the payments still to make.
  * "Save as PDF" uses the browser's print dialog (works on phones too).
  */
-export default function Statement({ tripName, currency, persons, expenses, payments, plan }: {
+export default function Statement({ tripName, currency, persons, expenses, payments, plan, payMethods = {}, me = '' }: {
   tripName: string; currency: string; persons: Person[]; expenses: Exp[]; payments: Pay[]; plan: Settlement[];
+  /** person id → ways to pay them (UPI etc.), for tap-to-pay links */
+  payMethods?: Record<string, PayMethod[]>;
+  me?: string;
 }) {
   // Whole amounts without .00 so the table fits on a phone
   const money = (n: number) => formatCurrency(n, currency).replace(/[.,]00(?!\d)/, '');
   const name = (id: string | null | undefined) => persons.find((p) => p.id === id)?.name ?? '—';
   const { rows, totals, checks } = statementRows(expenses, persons, payments);
+  const stats = tripStats(expenses.map((e) => ({ ...e, category: e.category ?? null, created_by: e.created_by ?? null })) as any, persons);
+  const site = typeof location !== 'undefined' ? location.origin : 'https://gotripsplit.app';
   const th = 'text-left font-semibold text-gray-600 py-1.5 pr-2 text-xs sm:text-sm';
   const td = 'py-1.5 pr-2 align-top text-xs sm:text-sm';
   const num = 'text-right tabular-nums whitespace-nowrap';
@@ -38,7 +48,7 @@ export default function Statement({ tripName, currency, persons, expenses, payme
         nav, .no-print { display: none !important; }
         body, .statement { background: #fff !important; color: #000 !important; }
         main { padding: 0 !important; }
-        .statement section { break-inside: avoid; }
+        .statement .rounded-2xl, .statement tr, .statement li { break-inside: avoid; }
       }`}</style>
 
       <header className="flex items-start justify-between gap-4">
@@ -53,6 +63,13 @@ export default function Statement({ tripName, currency, persons, expenses, payme
           <Printer size={16} /> Save as PDF
         </button>
       </header>
+
+      {stats.count > 0 && (
+        <section className="mt-6">
+          <h2 className="font-semibold mb-2">The trip in numbers 🎉</h2>
+          <TripStatsPanel stats={stats} me={me} />
+        </section>
+      )}
 
       <section className="mt-6">
         <h2 className="font-semibold">1. Everyone&apos;s balance</h2>
@@ -85,11 +102,28 @@ export default function Statement({ tripName, currency, persons, expenses, payme
 
       <section className="mt-6">
         <h2 className="font-semibold">2. Payments to settle up</h2>
-        {plan.length === 0 ? <p className="mt-1 text-gray-600">Nothing to pay. Everyone is settled.</p> : (
-          <ul className="mt-1 space-y-0.5">
-            {plan.map((s, i) => <li key={i}>{s.from_name} pays {s.to_name} <strong className="tabular-nums">{money(s.amount)}</strong></li>)}
+        {plan.length === 0 ? <p className="mt-1 text-gray-600">Nothing to pay. Everyone is settled.</p> : (<>
+          <ul className="mt-1 space-y-2">
+            {plan.map((s, i) => {
+              const ways = payActions(payMethods[s.to_id] ?? [], s.amount, currency, `${tripName} settle-up`, s.to_name);
+              const upi = (payMethods[s.to_id] ?? []).find((m) => m.type === 'upi')?.value;
+              return (
+                <li key={i}>
+                  {s.from_name} pays {s.to_name} <strong className="tabular-nums">{money(s.amount)}</strong>
+                  {(ways.some((w) => w.href) || upi) && (
+                    <span className="block text-xs text-gray-600">
+                      {ways.filter((w) => w.href).map((w) => (
+                        <a key={w.type + w.value} href={w.href!} className="mr-3 font-medium text-blue-600 underline">Pay via {w.label}</a>
+                      ))}
+                      {upi && <>UPI ID: <span className="font-medium text-gray-900">{upi}</span></>}
+                    </span>
+                  )}
+                </li>
+              );
+            })}
           </ul>
-        )}
+          <p className="mt-2 text-xs text-gray-500">Pay links open your UPI app with the amount filled in (on a phone).</p>
+        </>)}
       </section>
 
       <section className="mt-6">
@@ -127,7 +161,17 @@ export default function Statement({ tripName, currency, persons, expenses, payme
         </section>
       )}
 
-      <p className="mt-8 text-xs text-gray-400">Made with TripSplit · gotripsplit.app</p>
+      <section className="mt-8 rounded-2xl border border-gray-200 p-4">
+        <h2 className="font-semibold">Enjoyed splitting with TripSplit?</h2>
+        <p className="mt-1 text-gray-600">It&apos;s free, with no ads and no daily limits, built by one person.</p>
+        <ul className="mt-2 space-y-1">
+          <li>✈️ Friends travelling soon? Send them <a href={site} className="font-medium text-blue-600 underline">gotripsplit.app</a></li>
+          <li>💬 Tell us what to improve: <a href={`${site}/feedback?from=statement`} className="font-medium text-blue-600 underline">give feedback</a> (takes a minute)</li>
+          <li>☕ Like it? <span className="inline-block align-middle"><SupportLinks /></span></li>
+        </ul>
+      </section>
+
+      <p className="mt-6 text-xs text-gray-400">Made with TripSplit · gotripsplit.app</p>
     </div>
   );
 }

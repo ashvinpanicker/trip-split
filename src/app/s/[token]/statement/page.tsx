@@ -3,6 +3,7 @@
 import { use, useEffect, useState } from 'react';
 import Statement from '@/components/balances/Statement';
 import { createClient } from '@/lib/supabase/client';
+import { readPayMethods, type PayMethod } from '@/lib/utils/payMethods';
 import { calculateGroupBalances, directDebts, smartSettle, setActiveCurrency, type BalancePerson } from '@/lib/utils/balance';
 
 /** The same statement, for friends with a balance link (no sign-in). */
@@ -29,5 +30,8 @@ export default function LinkStatementPage({ params }: { params: Promise<{ token:
   const direct = directDebts(expenses, persons, data.settlements);
   const plan = data.group.simplify_debts ? smartSettle(balances, direct) : direct;
 
-  return <Statement tripName={data.group.name} currency={currency} persons={persons} expenses={expenses} payments={data.settlements} plan={plan} />;
+  const payMethods: Record<string, PayMethod[]> = {};
+  for (const m of data.members) payMethods[m.id] = readPayMethods(m.pay_methods, m.upi_id);
+
+  return <Statement tripName={data.group.name} currency={currency} persons={persons} expenses={expenses} payments={data.settlements} plan={plan} payMethods={payMethods} me={data.person_id} />;
 }
