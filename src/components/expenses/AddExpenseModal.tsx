@@ -10,6 +10,7 @@ import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import Avatar from '@/components/ui/Avatar';
+import { useAdvanced } from '@/hooks/useAdvanced';
 import { useToast } from '@/components/ui/Toast';
 import type { Group, ParticipantEntry, SplitType } from '@/types';
 
@@ -66,6 +67,10 @@ export default function AddExpenseModal({
       : emptyBill()
   );
   const [participants, setParticipants] = useState<ParticipantEntry[]>([]);
+  // Simple by default: equal split; other split types one tap away (or always shown with Advanced on)
+  const advanced = useAdvanced(false);
+  const [moreSplits, setMoreSplits] = useState(!!expense && (expense.split_type !== 'equal' || !!expense.items));
+  const showSplitTypes = advanced || moreSplits;
 
   // Add person inline
   const [showAddPerson, setShowAddPerson] = useState(false);
@@ -392,6 +397,14 @@ export default function AddExpenseModal({
         </div>
 
         {/* Split type */}
+        {!showSplitTypes ? (
+          <p className="text-sm text-gray-700">
+            Split equally{' '}
+            <button type="button" onClick={() => setMoreSplits(true)} className="font-medium text-blue-600">
+              Change
+            </button>
+          </p>
+        ) : (
         <div>
           <label className="text-sm font-medium text-gray-700 mb-2 block">Split type</label>
           <div className="flex gap-2">
@@ -425,6 +438,7 @@ export default function AddExpenseModal({
             </button>
           </div>
         </div>
+        )}
 
         {/* Participants */}
         {itemMode ? (

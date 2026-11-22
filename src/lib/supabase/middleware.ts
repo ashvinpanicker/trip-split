@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 const MARKETING_PATHS = ['/', '/splitwise-alternative', '/how-to-split-trip-expenses', '/sitemap.xml', '/robots.txt', '/llms.txt', '/sw.js', '/offline.html', '/privacy', '/terms'];
 // Everything under these is public content (guides, blog)
-const MARKETING_PREFIXES = ['/guides', '/blog'];
+const MARKETING_PREFIXES = ['/guides', '/blog', '/s'];
 const isMarketing = (p: string) =>
   MARKETING_PATHS.includes(p) || MARKETING_PREFIXES.some((x) => p === x || p.startsWith(`${x}/`));
 

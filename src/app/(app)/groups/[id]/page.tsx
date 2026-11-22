@@ -28,6 +28,7 @@ import { useExpenses, useSettlements } from '@/hooks/useExpenses';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/components/ui/Toast';
 import { useUser } from '@/hooks/useUser';
+import { useAdvancedPref } from '@/hooks/useAdvanced';
 import { setActiveCurrency, calculateGroupBalances, smartSettle, directDebts, formatCurrency, categoryOf, type BalancePerson } from '@/lib/utils/balance';
 import type { Expense, ExpenseParticipant } from '@/types';
 
@@ -63,6 +64,8 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
   const [payerFilter, setPayerFilter] = useState<string | null>(null);
   // One signal for "something changed": expenses, totals and the activity feed all reload on it
   const changed = () => window.dispatchEvent(new Event('tripsplit:expenses-changed'));
+  // null = no saved choice yet (admins then see advanced features)
+  const advancedPref = useAdvancedPref();
 
   if (groupLoading) {
     return (
@@ -99,13 +102,19 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
   const settlements = smartSettle(balances, directPlan);
   const myRole = (group.members || []).find((m: any) => m.user_id === user.id)?.role;
   const isAdmin = myRole === 'admin';
+  const advanced = advancedPref ?? isAdmin;
   const simplify = !!group.simplify_debts;
   const adminCount = (group.members || []).filter((m: any) => m.role === 'admin').length;
 
   const stats = tripStats(expensesWithParts, allPersons);
   // "Just track spending": no balances or settle-up (who paid is still saved)
   const trackOnly = !!group.track_only;
-  const view = trackOnly && tab === 'balances' ? 'expenses' : tab;
+  const views: { key: Tab; label: string }[] = [
+    { key: 'expenses', label: 'Expenses' },
+    ...(trackOnly ? [] : [{ key: 'balances' as Tab, label: 'Balances' }]),
+    ...(advanced ? [{ key: 'stats' as Tab, label: 'Stats' }] : []),
+  ];
+  const view = (trackOnly && tab === 'balances') || (!advanced && (tab === 'stats' || tab === 'activity')) ? 'expenses' : tab;
   const myPaid = stats.paidUpfront.find((p) => p.id === user.id)?.total ?? 0;
   const shown = filterExpenses(expenses, { query, category: catFilter, payer: payerFilter });
 
@@ -186,7 +195,7 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
             {([
               { key: 'members', label: `People (${allPersons.length})`, icon: Users, badge: allPersons.length },
               { key: 'activity', label: 'Activity', icon: History, badge: 0 },
-            ] as const).map(({ key, label, icon: Icon, badge }) => (
+            ] as const).filter((b) => advanced || b.key !== 'activity').map(({ key, label, icon: Icon, badge }) => (
               <button
                 key={key}
                 onClick={() => setTab(tab === key ? 'expenses' : key)}
@@ -249,14 +258,11 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
         </div>
       </div>
 
-      {/* Main views: a compact segmented switch */}
+      {/* Main views: a compact segmented switch (hidden when there's only one) */}
+      {views.length > 1 && (
       <div className="bg-white border-b border-gray-100 px-4 py-2">
-        <div role="tablist" aria-label="Trip views" className={`grid ${trackOnly ? 'grid-cols-2' : 'grid-cols-3'} gap-1 rounded-xl bg-gray-100 p-1`}>
-          {([
-            { key: 'expenses', label: 'Expenses' },
-            ...(trackOnly ? [] : [{ key: 'balances', label: 'Balances' }]),
-            { key: 'stats', label: 'Stats' },
-          ] as { key: Tab; label: string }[]).map(({ key, label }) => (
+        <div role="tablist" aria-label="Trip views" className={`grid ${views.length === 3 ? 'grid-cols-3' : 'grid-cols-2'} gap-1 rounded-xl bg-gray-100 p-1`}>
+          {views.map(({ key, label }) => (
             <button
               key={key}
               role="tab"
@@ -271,6 +277,7 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
           ))}
         </div>
       </div>
+      )}
 
       {(tab === 'members' || tab === 'activity') && (
         <div className="px-4 pt-3 -mb-1 flex items-center justify-between">
@@ -346,9 +353,9 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
                   onUpdate={changed}
                 />
               ))}
-              <button onClick={exportCsv} className="w-full flex items-center justify-center gap-2 h-10 rounded-xl border border-gray-200 bg-white text-sm font-medium text-gray-700">
+              {advanced && <button onClick={exportCsv} className="w-full flex items-center justify-center gap-2 h-10 rounded-xl border border-gray-200 bg-white text-sm font-medium text-gray-700">
                 <Download size={15} /> Export expenses (CSV)
-              </button>
+              </button>}
             </>
           )
         )}

@@ -2,6 +2,7 @@
 
 import { clearOfflineCache, InstallPrompt } from '@/components/pwa/Pwa';
 import PayMethodsEditor from '@/components/profile/PayMethodsEditor';
+import SettingsCard from '@/components/profile/SettingsCard';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { LogOut, User, Mail, Edit2, Check, IndianRupee } from 'lucide-react';
@@ -108,6 +109,8 @@ export default function ProfilePage() {
         </Card>
 
         <PayMethodsEditor userId={user.id} initial={(user as any).pay_methods} legacyUpi={user.upi_id} />
+
+        <SettingsCard />
 
         <InstallPrompt persistent />
 

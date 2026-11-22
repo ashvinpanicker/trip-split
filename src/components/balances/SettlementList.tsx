@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ArrowRight, Check, Copy, ExternalLink, MessageCircle } from 'lucide-react';
 import Avatar from '@/components/ui/Avatar';
 import { useToast } from '@/components/ui/Toast';
@@ -29,6 +29,20 @@ export default function SettlementList({
 }: SettlementListProps) {
   const { toast } = useToast();
   const [savingIdx, setSavingIdx] = useState<number | null>(null);
+  // Personal "your balance" links (no sign-in) for people who owe you; falls back to the trip page
+  const [links, setLinks] = useState<Record<string, string>>({});
+  const debtorKey = settlements.filter((x) => x.to_id === currentUserId).map((x) => x.from_id).sort().join(',');
+  useEffect(() => {
+    if (!groupId || !debtorKey) return;
+    const supabase = createClient();
+    Promise.all(debtorKey.split(',').map(async (pid) => {
+      const { data, error } = await supabase.rpc('balance_link_for', { p_group_id: groupId, p_person_id: pid });
+      return [pid, error || !data ? null : `${location.origin}/s/${data}`] as const;
+    })).then((rows) => setLinks(Object.fromEntries(rows.filter(([, u]) => u) as [string, string][])));
+  }, [groupId, debtorKey]);
+  const remindText = (s: Settlement) =>
+    `Hey ${s.from_name.split(' ')[0]}, quick nudge from ${groupName ?? 'our trip'}: you owe me ${formatCurrency(s.amount)}. ` +
+    `See it and pay in one tap here: ${links[s.from_id] ?? `${typeof location !== 'undefined' ? location.origin : 'https://gotripsplit.app'}/groups/${groupId}`}`;
 
   async function copyAddress(label: string, value: string) {
     try {
@@ -120,19 +134,6 @@ export default function SettlementList({
 
             {groupId && !(isYouPaying || isYouReceiving) && (
               <div className="flex justify-end mt-1.5">
-                {isYouReceiving && (
-                  <a
-                    href={`https://wa.me/?text=${encodeURIComponent(
-                      `Hey ${s.from_name.split(' ')[0]}, quick nudge from ${groupName ?? 'our trip'}: you owe me ${formatCurrency(s.amount)}. ` +
-                        `The details and a pay button are here: ${typeof location !== 'undefined' ? location.origin : 'https://gotripsplit.app'}/groups/${groupId}`,
-                    )}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-lg bg-white border border-green-200 text-green-700 text-sm font-medium"
-                  >
-                    <MessageCircle size={14} /> Remind
-                  </a>
-                )}
                 <button
                   onClick={() => markPaid(s, i)}
                   disabled={savingIdx !== null}
@@ -175,10 +176,7 @@ export default function SettlementList({
               <div className="flex gap-2">
                 {isYouReceiving && (
                   <a
-                    href={`https://wa.me/?text=${encodeURIComponent(
-                      `Hey ${s.from_name.split(' ')[0]}, quick nudge from ${groupName ?? 'our trip'}: you owe me ${formatCurrency(s.amount)}. ` +
-                        `The details and a pay button are here: ${typeof location !== 'undefined' ? location.origin : 'https://gotripsplit.app'}/groups/${groupId}`,
-                    )}`}
+                    href={`https://wa.me/?text=${encodeURIComponent(remindText(s))}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-lg bg-white border border-green-200 text-green-700 text-sm font-medium"
