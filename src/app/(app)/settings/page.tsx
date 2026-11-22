@@ -15,6 +15,7 @@ import { createClient } from '@/lib/supabase/client';
 import { clearCache } from '@/hooks/cache';
 import { useUser } from '@/hooks/useUser';
 import { useT } from '@/lib/i18n';
+import { REPO_URL } from '@/lib/marketing/site';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -64,7 +65,7 @@ export default function SettingsPage() {
         </Button>
 
         <div className="text-center text-xs text-gray-500 pt-2 pb-10 space-y-2">
-          <p>TripSplit is free and open source. <a href="https://github.com/ashvinpanicker/trip-split" className="underline">Source code</a></p>
+          <p>TripSplit is free and open source. <a href={REPO_URL} className="underline">Source code</a> · <a href="/blog" className="underline">Blog</a></p>
           <SupportLinks className="mt-1 [&_div]:justify-center" />
         </div>
       </div>

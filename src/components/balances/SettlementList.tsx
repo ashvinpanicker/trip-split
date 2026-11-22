@@ -1,5 +1,6 @@
 'use client';
 
+import { savePayments } from '@/lib/outbox';
 import { useT } from '@/lib/i18n';
 import { useEffect, useState } from 'react';
 import { ArrowRight, Check, Copy, ExternalLink, MessageCircle, QrCode } from 'lucide-react';
@@ -89,20 +90,13 @@ export default function SettlementList({
     const who = s.from_id === currentUserId ? t('you') : s.from_name;
     if (!confirmed && !confirm(t('settle.confirm', { who, to: s.to_id === currentUserId ? t('you') : s.to_name, amount: formatCurrency(s.amount) }))) return;
     setSavingIdx(idx);
-    const supabase = createClient();
-    const { error } = await supabase.from('settlements').insert({
-      group_id: groupId,
-      from_person: s.from_id,
-      to_person: s.to_id,
-      amount: s.amount,
-      created_by: currentUserId,
-    });
+    const { error, queued } = await savePayments(createClient(), [{
+      group_id: groupId, from_person: s.from_id, to_person: s.to_id, amount: s.amount,
+      date: new Date().toISOString().slice(0, 10), note: null, created_by: currentUserId,
+    }], `${s.from_name} → ${s.to_name}`);
     setSavingIdx(null);
-    if (error) {
-      toast(error.message.includes('settlements') ? 'Run supabase/goa_upgrade.sql first' : error.message, 'error');
-      return;
-    }
-    toast(t('settle.recorded'));
+    if (error) { toast(error.message, 'error'); return; }
+    toast(queued ? 'No signal. It’ll sync when you’re back online.' : t('settle.recorded'));
     onRecorded?.();
   }
 

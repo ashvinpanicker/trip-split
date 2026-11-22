@@ -97,6 +97,8 @@ export interface SettlementRecord {
   note: string | null;
   created_by: string | null;
   created_at: string;
+  /** The expense this pays back, when marked from the expense itself */
+  expense_id?: string | null;
 }
 
 export interface Balance {

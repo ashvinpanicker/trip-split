@@ -147,3 +147,17 @@ body {
 
 .no-scrollbar { scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* Tap feedback everywhere: no grey iOS flash, a quick press-in on anything you can tap */
+* { -webkit-tap-highlight-color: transparent; }
+@media (prefers-reduced-motion: no-preference) {
+  :where(button, [role="button"], [role="tab"], a.btn, nav a, label:has(> input[type="checkbox"])) {
+    transition-property: transform, color, background-color, border-color, box-shadow, opacity;
+    transition-duration: 150ms;
+    transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+  }
+  :where(button, [role="button"], [role="tab"], a.btn, nav a, label:has(> input[type="checkbox"])):not(:disabled):active {
+    transform: scale(0.96);
+    transition-duration: 60ms;
+  }
+}

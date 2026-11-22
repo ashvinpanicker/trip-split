@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Home, Users, PlusCircle, BarChart2, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
+import { motion } from 'motion/react';
+import { spring } from '@/lib/motion';
 
 const navItems = [
   { href: '/dashboard', icon: Home, label: 'nav.home' as const },
@@ -36,9 +38,13 @@ export default function BottomNav({ onAddExpense }: BottomNavProps) {
                 onClick={onAddExpense}
                 className="flex flex-col items-center pt-2 pb-1 px-3"
               >
-                <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center shadow-lg shadow-blue-200 dark:shadow-blue-950/60 -mt-4">
+                <motion.div
+                  whileTap={{ scale: 0.88, rotate: 90 }}
+                  transition={spring}
+                  className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center shadow-lg shadow-blue-200 dark:shadow-blue-950/60 -mt-4"
+                >
                   <Icon size={22} className="text-white" />
-                </div>
+                </motion.div>
                 <span className="text-xs text-gray-400 mt-1">{t(item.label)}</span>
               </button>
             );
@@ -48,8 +54,11 @@ export default function BottomNav({ onAddExpense }: BottomNavProps) {
             <Link
               key={item.href + item.label}
               href={item.href}
-              className="flex flex-col items-center pt-2 pb-1 px-3 min-w-0"
+              className="relative flex flex-col items-center pt-2 pb-1 px-3 min-w-0"
             >
+              {isActive && (
+                <motion.span layoutId="nav-active" transition={spring} className="absolute top-0 h-0.5 w-8 rounded-full bg-blue-600" />
+              )}
               <Icon
                 size={22}
                 className={cn(

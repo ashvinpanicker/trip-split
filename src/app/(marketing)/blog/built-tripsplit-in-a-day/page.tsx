@@ -38,7 +38,7 @@ export default function Page() {
         <li><strong>A new home:</strong> moved to Cloudflare so it runs fast and free.</li>
         <li><strong>One invite link:</strong> add friends by name, drop one link in WhatsApp, each person taps their name.</li>
         <li><strong>Maths you can trust:</strong> everything in whole paise, a split can’t save unless it adds up exactly, and a test suite that checks the settle-up plan against a brute-force answer.</li>
-        <li><strong>Smart settle-up:</strong> the fewest payments, but pay-back-who-paid-for-you by default, because people trust that more.</li>
+        <li><strong>Smart settle-up:</strong> the fewest payments, keeping real debts (“Rahul pays me for breakfast”) wherever it can.</li>
         <li><strong>Trust features:</strong> group admins, a full activity log of every add, edit and delete, and a breakdown behind every payment.</li>
         <li><strong>The fun stuff:</strong> itemized bills, receipt photos, trip stats with charts, and awards like Chief Beer Officer.</li>
         <li><strong>Worldwide:</strong> any currency symbol per trip, and pay buttons for UPI, PayPal, Revolut, Wise, Venmo, Cash App and crypto.</li>

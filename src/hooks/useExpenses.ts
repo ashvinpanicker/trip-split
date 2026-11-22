@@ -111,6 +111,11 @@ export function useSettlements(groupId: string) {
   useRefreshOn(load);
 
   useEffect(() => { load(); }, [load]);
+  // Expenses can carry payments ("paid on the spot", deleted along with the expense)
+  useEffect(() => {
+    window.addEventListener('tripsplit:expenses-changed', load);
+    return () => window.removeEventListener('tripsplit:expenses-changed', load);
+  }, [load]);
 
   return { settlements, refetch: load };
 }

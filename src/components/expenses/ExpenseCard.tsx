@@ -10,6 +10,8 @@ import { useToast } from '@/components/ui/Toast';
 import { formatCurrency, categoryOf, payerIdOf } from '@/lib/utils/balance';
 import type { Expense } from '@/types';
 import AddExpenseModal from './AddExpenseModal';
+import { paidBackNote } from '@/lib/utils/paidBack';
+import { savePayments } from '@/lib/outbox';
 import ReceiptPhoto from './ReceiptPhoto';
 import { groupColor, type GroupColor } from '@/lib/utils/groupColor';
 
@@ -22,9 +24,11 @@ interface ExpenseCardProps {
   currency?: string;
   /** Show which trip this is from (dashboard, when you're in several) */
   group?: { id: string; name: string; color?: GroupColor };
+  /** People who've already paid the payer back for this expense */
+  paidBack?: Set<string>;
 }
 
-export default function ExpenseCard({ expense, currentUserId, onDelete, onUpdate, currency, group }: ExpenseCardProps) {
+export default function ExpenseCard({ expense, currentUserId, onDelete, onUpdate, currency, group, paidBack }: ExpenseCardProps) {
   const gc = group ? group.color ?? groupColor(group.id) : null;
   const { toast } = useToast();
   const supabase = createClient();
@@ -44,6 +48,24 @@ export default function ExpenseCard({ expense, currentUserId, onDelete, onUpdate
 
   const myParticipation = expense.participants?.find((p) => p.user_id === currentUserId);
   const myShare = myParticipation?.share_amount ?? 0;
+  const owers = (expense.participants ?? []).filter((p) => (p.user_id ?? p.pending_member_id) !== payerId && Number(p.share_amount) > 0);
+  const isPaidBack = (pid?: string | null) => !!pid && !!paidBack?.has(pid);
+  const allSettled = owers.length > 0 && owers.every((p) => isPaidBack(p.user_id ?? p.pending_member_id));
+  const [marking, setMarking] = useState<string | null>(null);
+
+  // "I paid Rahul back for the dinner": a payment tied to this expense, so the plan updates around it
+  async function markPaidBack(pid: string, share: number) {
+    if (!payerId) return;
+    setMarking(pid);
+    const { error, queued } = await savePayments(supabase, [{
+      group_id: expense.group_id, from_person: pid, to_person: payerId, amount: Number(share),
+      date: format(new Date(), 'yyyy-MM-dd'), note: paidBackNote(expense.title), created_by: currentUserId, expense_id: expense.id,
+    }], paidBackNote(expense.title));
+    setMarking(null);
+    if (error) { toast(error.message, 'error'); return; }
+    toast(queued ? 'No signal. It’ll sync when you’re back online.' : 'Payment recorded');
+    onUpdate?.();
+  }
 
   async function handleDelete() {
     if (!confirm(t('exp.confirmDelete'))) return;
@@ -108,8 +130,12 @@ export default function ExpenseCard({ expense, currentUserId, onDelete, onUpdate
                 <div className="text-right">
                   <p className="font-bold text-gray-900">{formatCurrency(expense.amount, currency)}</p>
                   {expense.fx && <p className="text-xs text-gray-500">{formatCurrency(expense.fx.amount, expense.fx.currency)}</p>}
-                  {isMyExpense ? (
+                  {allSettled ? (
+                    <p className="text-xs text-gray-500 font-medium">✓ {t('exp.settled')}</p>
+                  ) : isMyExpense ? (
                     <p className="text-xs text-green-600 font-medium">{t('exp.youPaid')}</p>
+                  ) : myShare > 0 && isPaidBack(currentUserId) ? (
+                    <p className="text-xs text-gray-500 font-medium">✓ {t('exp.paidBack')}</p>
                   ) : myShare > 0 ? (
                     <p className="text-xs text-red-500 font-medium">{t('exp.youOwe', { amount: formatCurrency(myShare, currency) })}</p>
                   ) : null}
@@ -189,7 +215,22 @@ export default function ExpenseCard({ expense, currentUserId, onDelete, onUpdate
                         <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">paid</span>
                       )}
                     </div>
-                    <span className="text-sm font-medium text-gray-900">{formatCurrency(p.share_amount, currency)}</span>
+                    <span className="flex items-center gap-2">
+                      {pid && pid !== payerId && Number(p.share_amount) > 0 && paidBack && (
+                        isPaidBack(pid) ? (
+                          <span className="text-xs text-gray-500">✓ {t('exp.paidBack')}</span>
+                        ) : (pid === currentUserId || payerId === currentUserId) ? (
+                          <button
+                            onClick={() => markPaidBack(pid, p.share_amount)}
+                            disabled={marking === pid}
+                            className="text-xs font-medium text-blue-600 disabled:opacity-50"
+                          >
+                            {marking === pid ? '…' : t('exp.markPaidBack')}
+                          </button>
+                        ) : null
+                      )}
+                      <span className="text-sm font-medium text-gray-900">{formatCurrency(p.share_amount, currency)}</span>
+                    </span>
                   </div>
                 );
               })}

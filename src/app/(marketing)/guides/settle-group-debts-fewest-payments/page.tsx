@@ -14,7 +14,7 @@ const faq: Faq[] = [
   },
   {
     q: 'Is simplifying debts fair?',
-    a: 'Everyone pays or receives exactly the same total either way; only the routing changes. The catch is that you might pay someone you didn’t owe directly, which can feel odd. That’s why TripSplit shows “by person” payments by default and lets the group admin turn simplifying on.',
+    a: 'Everyone pays or receives exactly the same total either way; only the routing changes. The catch is that you might pay someone you didn’t owe directly, which can feel odd. TripSplit marks those payments so nobody is surprised, and the group admin can switch to paying back by person.',
   },
   {
     q: 'How does TripSplit find the minimum?',
@@ -73,7 +73,7 @@ export default function Page() {
         <li><strong>Simplify</strong> for big groups and long trips, where the saving in transfers is large.</li>
       </ul>
       <p>
-        TripSplit shows direct payments by default, with a “see breakdown” for every one, and lets the group admin switch to simplified payments.
+        TripSplit uses simplified payments by default, with a “see breakdown” for every one, and lets the group admin switch to paying back by person. Paid someone back directly for one big bill? Mark it on that expense and the plan updates.
         Either way, each payment opens your payment app with the amount filled in.
       </p>
     </ArticleShell>

@@ -2,7 +2,7 @@
 
 import PageSkeleton from '@/components/ui/PageSkeleton';
 import { useT } from '@/lib/i18n';
-import { useState, use } from 'react';
+import { useState, use, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Plus, Users, Receipt, Copy, Check, Trash2, History, Search, Download } from 'lucide-react';
 import { format } from 'date-fns';
@@ -33,6 +33,12 @@ import { useUser } from '@/hooks/useUser';
 import { useAdvancedPref } from '@/hooks/useAdvanced';
 import { setActiveCurrency, calculateGroupBalances, smartSettle, directDebts, formatCurrency, categoryOf, type BalancePerson } from '@/lib/utils/balance';
 import type { Expense, ExpenseParticipant } from '@/types';
+import { paidBackMap } from '@/lib/utils/paidBack';
+import { motion } from 'motion/react';
+import { PendingChanges, useOutbox } from '@/components/pwa/Sync';
+import { enter, spring } from '@/lib/motion';
+
+const EMPTY = new Set<string>();
 
 type Tab = 'expenses' | 'balances' | 'stats' | 'members' | 'activity';
 
@@ -66,6 +72,13 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
   const [payerFilter, setPayerFilter] = useState<string | null>(null);
   // One signal for "something changed": expenses, totals and the activity feed all reload on it
   const changed = () => window.dispatchEvent(new Event('tripsplit:expenses-changed'));
+  // Payments saved offline count straight away, so nobody taps "Mark paid" twice
+  const queued = useOutbox(id);
+  const counted = useMemo(
+    () => [...payments, ...queued.flatMap((o) => (o.kind === 'payments' ? o.rows : []))],
+    [payments, queued]
+  );
+  const paidBack = useMemo(() => paidBackMap(counted, expenses), [counted, expenses]);
   // null = no saved choice yet (admins then see advanced features)
   const advancedPref = useAdvancedPref();
   const t = useT();
@@ -101,8 +114,8 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
   for (const m of group.members || []) payMethods[m.user_id] = readPayMethods((m.profile as any)?.pay_methods, (m.profile as any)?.upi_id);
 
   const expensesWithParts = expenses.filter((e) => e.participants) as (Expense & { participants: ExpenseParticipant[] })[];
-  const balances = calculateGroupBalances(expensesWithParts, allPersons, payments);
-  const directPlan = directDebts(expensesWithParts, allPersons, payments);
+  const balances = calculateGroupBalances(expensesWithParts, allPersons, counted);
+  const directPlan = directDebts(expensesWithParts, allPersons, counted);
   const settlements = smartSettle(balances, directPlan);
   const myRole = (group.members || []).find((m: any) => m.user_id === user.id)?.role;
   const isAdmin = myRole === 'admin';
@@ -272,11 +285,12 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
               role="tab"
               aria-selected={view === key}
               onClick={() => setTab(key)}
-              className={`h-9 rounded-lg text-sm font-medium transition-colors ${
-                view === key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              className={`relative h-9 rounded-lg text-sm font-medium transition-colors ${
+                view === key ? 'text-gray-900' : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              {label}
+              {view === key && <motion.span layoutId="trip-tab" transition={spring} className="absolute inset-0 rounded-lg bg-white shadow-sm" />}
+              <span className="relative">{label}</span>
             </button>
           ))}
         </div>
@@ -290,7 +304,8 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
         </div>
       )}
 
-      <div className="flex-1 p-4 space-y-3">
+      <motion.div key={view} {...enter} className="flex-1 p-4 space-y-3">
+        <PendingChanges groupId={id} />
         {/* Expenses tab */}
         {view === 'expenses' && (
           expLoading ? (
@@ -355,6 +370,7 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
                   currentUserId={user.id}
                   onDelete={changed}
                   onUpdate={changed}
+                  paidBack={paidBack.get(expense.id) ?? EMPTY}
                 />
               ))}
               {advanced && <button onClick={exportCsv} className="w-full flex items-center justify-center gap-2 h-10 rounded-xl border border-gray-200 bg-white text-sm font-medium text-gray-700">
@@ -375,6 +391,7 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
               simplified={settlements}
               byPerson={directPlan}
               simplify={simplify}
+              advanced={advanced}
               isAdmin={isAdmin}
               onToggleSimplify={toggleSimplify}
               onOpenPerson={setPersonId}
@@ -395,7 +412,7 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
                       <p className="text-sm text-gray-900 truncate">
                         {nameOf(p.from_person)} → {nameOf(p.to_person)}
                       </p>
-                      <p className="text-xs text-gray-500">{format(new Date(p.date), 'MMM d')}</p>
+                      <p className="text-xs text-gray-500 truncate">{format(new Date(p.date), 'MMM d')}{p.note ? ` · ${p.note}` : ''}</p>
                     </div>
                     <span className="text-sm font-semibold text-gray-900">{formatCurrency(p.amount)}</span>
                     <button onClick={() => deletePayment(p.id)} className="p-1.5 text-gray-300 hover:text-red-500">
@@ -507,7 +524,7 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
             )}
           </div>
         )}
-      </div>
+      </motion.div>
 
       <PersonSheet
         open={!!personId}

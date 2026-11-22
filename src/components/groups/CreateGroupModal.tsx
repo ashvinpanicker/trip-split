@@ -41,7 +41,7 @@ export default function CreateGroupModal({ open, onClose, onSuccess }: CreateGro
 
     const { error: groupErr } = await supabase
       .from('groups')
-      .insert({ id: groupId, name: name.trim(), description: description.trim() || null, currency, kind, track_only: trackOnly, created_by: user.id });
+      .insert({ id: groupId, name: name.trim(), description: description.trim() || null, currency, kind, track_only: trackOnly, simplify_debts: true, created_by: user.id });
 
     if (groupErr) {
       toast(groupErr.message, 'error');

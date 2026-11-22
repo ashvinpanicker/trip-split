@@ -75,6 +75,15 @@ export const ARTICLES: ArticleMeta[] = [
     readMins: 4,
   },
   {
+    path: '/blog/what-friends-asked-for-after-goa',
+    kind: 'blog',
+    title: 'Card at dinner, UPI after, no signal: what friends asked for after Goa',
+    description: 'How TripSplit now handles paying on the spot, paying one friend back directly, offline expenses, Hindi and UPI, based on feedback from a real group trip.',
+    published: '2026-11-22',
+    updated: '2026-11-22',
+    readMins: 4,
+  },
+  {
     path: '/blog/built-tripsplit-in-a-day',
     kind: 'blog',
     title: 'Our Splitwise ran out mid-trip, so we vibecoded our own in a day',

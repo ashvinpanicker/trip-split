@@ -1,5 +1,7 @@
 'use client';
 
+import { paidBackNote } from '@/lib/utils/paidBack';
+import { enqueue, isOffline, sendPayments } from '@/lib/outbox';
 import { useT } from '@/lib/i18n';
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
@@ -72,6 +74,8 @@ export default function AddExpenseModal({
   const [category, setCategory] = useState(expense?.category ?? 'food');
   const [splitType, setSplitType] = useState<SplitType>(expense?.split_type ?? 'equal');
   const [notes, setNotes] = useState(expense?.notes ?? '');
+  // Card swiped at the restaurant and everyone paid back right there: record it, but nobody owes anything
+  const [settledNow, setSettledNow] = useState(false);
   // Itemized bill mode (saved as an exact split, with the items kept for re-editing)
   const [itemMode, setItemMode] = useState(!!expense?.items);
   const emptyBill = (): DraftBill => ({ items: [{ name: '', price: '', people: [] }], extra: '' });
@@ -295,7 +299,7 @@ export default function AddExpenseModal({
       }));
 
       // One atomic call: expense + split saved together, and the DB rejects splits that don't add up
-      const { error } = await supabase.rpc('save_expense', {
+      const args = {
         p_expense_id: isEditing && expense ? expense.id : null,
         p_group_id: selectedGroupId,
         p_title: title.trim(),
@@ -314,8 +318,31 @@ export default function AddExpenseModal({
             }
           : null,
         ...(foreign ? { p_fx: { currency: payCur, amount: total, rate: fxRate } } : {}),
-      });
+      };
+      // Card swiped and everyone paid back on the spot: one payment per person, tied to the expense
+      const paybacks = settledNow && !isEditing
+        ? included
+            .map((p, k) => ({ p, share: conv.shares[k] }))
+            .filter(({ p, share }) => p.id !== paidBy && share > 0)
+            .map(({ p, share }) => ({
+              group_id: selectedGroupId!, from_person: p.id, to_person: paidBy, amount: share, date,
+              note: paidBackNote(title.trim()), created_by: currentUserId,
+            }))
+        : [];
+      const { data: savedId, error } = navigator.onLine
+        ? await supabase.rpc('save_expense', args)
+        : { data: null, error: { message: 'offline' } };
+      if (error && isOffline(error)) {
+        enqueue({ kind: 'expense', groupId: selectedGroupId!, label: title.trim(), amount: conv.amount, args, paybacks });
+        toast('No signal. Saved on this phone, it’ll sync when you’re back online.');
+        onSuccess?.(); onClose(); resetForm();
+        return;
+      }
       if (error) throw error;
+      if (paybacks.length && savedId) {
+        const { error: payErr } = await sendPayments(supabase, paybacks.map((r) => ({ ...r, expense_id: savedId as string })));
+        if (payErr) toast(`Expense saved, but the paybacks didn’t: ${payErr.message}`, 'error');
+      }
       if (foreign && keepRate) await supabase.rpc('set_trip_rate', { p_group_id: selectedGroupId, p_currency: payCur, p_rate: fxRate });
       try { localStorage.setItem(`tripsplit:paycur:${selectedGroupId}`, foreign ? payCur : ''); } catch {}
       toast(isEditing ? t('add.updated') : t('add.added'));
@@ -332,7 +359,7 @@ export default function AddExpenseModal({
 
   function resetForm() {
     setTitle(''); setAmount(''); setDate(format(new Date(), 'yyyy-MM-dd'));
-    setPaidBy(''); setSplitType('equal'); setNotes(''); setCategory('food');
+    setPaidBy(''); setSplitType('equal'); setNotes(''); setCategory('food'); setSettledNow(false);
     setItemMode(false); setBill(emptyBill());
     setParticipants([]); setShowAddPerson(false); setNewPersonName('');
     if (!initialGroupId) { setStep('group'); setSelectedGroupId(null); }
@@ -482,6 +509,18 @@ export default function AddExpenseModal({
             ))}
           </div>
         </div>
+
+        {advanced && !isEditing && paidBy && (
+          <label className="flex items-start gap-2.5 rounded-xl bg-gray-50 px-3 py-2.5 cursor-pointer">
+            <input type="checkbox" checked={settledNow} onChange={(e) => setSettledNow(e.target.checked)} className="mt-0.5 h-4 w-4 accent-blue-600" />
+            <span className="min-w-0">
+              <span className="block text-sm font-medium text-gray-900">
+                {t('add.settledNow', { name: paidBy === currentUserId ? t('you').toLowerCase() : participants.find((m) => m.id === paidBy)?.name.split(' ')[0] ?? '' })}
+              </span>
+              <span className="block text-xs text-gray-500">{t('add.settledHint')}</span>
+            </span>
+          </label>
+        )}
 
         {/* Split type */}
         {!showSplitTypes ? (

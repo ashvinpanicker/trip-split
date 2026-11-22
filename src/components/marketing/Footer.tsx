@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { REPO_URL } from '@/lib/marketing/site';
+import { CONTACT_EMAIL, REPO_URL } from '@/lib/marketing/site';
 import SupportLinks from '@/components/SupportLinks';
 
 export default function Footer() {
@@ -26,7 +26,9 @@ export default function Footer() {
         <div className="grid gap-2 content-start">
           <Link href="/register" className="hover:text-[var(--blue)]">Create a free account</Link>
           <a href={REPO_URL} className="hover:text-[var(--blue)]" rel="noopener">Source code on GitHub</a>
+          <a href={`${REPO_URL}/issues`} className="hover:text-[var(--blue)]" rel="noopener">Report a bug on GitHub</a>
           <a href={`${REPO_URL}/blob/main/LICENSE`} className="hover:text-[var(--blue)]" rel="noopener">MIT licence</a>
+          <a href={`mailto:${CONTACT_EMAIL}`} className="hover:text-[var(--blue)]">{CONTACT_EMAIL}</a>
         </div>
       </div>
       <p className="wrap pb-3 text-sm text-[var(--ink-soft)]">

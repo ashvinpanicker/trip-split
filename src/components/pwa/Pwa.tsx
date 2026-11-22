@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { Download, Share, WifiOff, X } from 'lucide-react';
+import { clearOutbox } from '@/lib/outbox';
 
 /** Delete cached pages and data, e.g. on sign-out so the next person on this phone sees nothing. */
 export async function clearOfflineCache() {
   if (typeof caches === 'undefined') return;
+  clearOutbox();
   const keys = await caches.keys();
   await Promise.all(keys.filter((k) => k.startsWith('ts-')).map((k) => caches.delete(k)));
 }
@@ -34,7 +36,7 @@ export function OfflineBanner() {
   if (!offline) return null;
   return (
     <div role="status" className="sticky top-0 z-40 flex items-center justify-center gap-2 bg-amber-100 text-amber-900 text-xs font-medium px-3 py-2">
-      <WifiOff size={14} /> Offline. Showing what you last loaded. Add expenses once you're back online.
+      <WifiOff size={14} /> Offline. You can still add expenses and payments; they sync when you're back.
     </div>
   );
 }

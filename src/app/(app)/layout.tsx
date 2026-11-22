@@ -10,6 +10,9 @@ import BottomNav from '@/components/layout/BottomNav';
 import { ToastProvider } from '@/components/ui/Toast';
 import AddExpenseModal from '@/components/expenses/AddExpenseModal';
 import { OfflineBanner, ServiceWorker } from '@/components/pwa/Pwa';
+import { SyncManager } from '@/components/pwa/Sync';
+import { MotionConfig, motion } from 'motion/react';
+import { enter } from '@/lib/motion';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [showAddExpense, setShowAddExpense] = useState(false);
@@ -18,19 +21,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
   useEffect(() => { hydrateCache(); setReady(true); }, []);
   // On a group page, the centre "Add" button goes straight to that group's form
-  const groupMatch = usePathname().match(/^\/groups\/([0-9a-f-]{36})/);
+  const pathname = usePathname();
+  const groupMatch = pathname.match(/^\/groups\/([0-9a-f-]{36})/);
   const currentGroupId = groupMatch?.[1] ?? null;
   // Outside a group, money defaults to ₹ (the group page sets its own currency when it renders)
   if (!currentGroupId) setActiveCurrency('INR');
 
   return (
+    <MotionConfig reducedMotion="user">
     <ToastProvider>
       <ServiceWorker />
+      <SyncManager />
       <div className="flex flex-col min-h-screen bg-gray-50">
         <OfflineBanner />
         <main className="flex-1 pb-[calc(7rem+env(safe-area-inset-bottom))]">
           <PullToRefresh />
-          {ready ? children : <PageSkeleton />}
+          {ready ? <motion.div key={pathname} {...enter}>{children}</motion.div> : <PageSkeleton />}
         </main>
         <BottomNav onAddExpense={() => setShowAddExpense(true)} />
         <AddExpenseModal
@@ -42,5 +48,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         />
       </div>
     </ToastProvider>
+    </MotionConfig>
   );
 }

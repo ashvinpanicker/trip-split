@@ -21,6 +21,8 @@ interface SettleUpPanelProps {
   /** Group setting, changed by admins only */
   simplify: boolean;
   isAdmin: boolean;
+  /** Simple mode hides the how-it-works box and manual payments; the maths is the same either way */
+  advanced: boolean;
   onToggleSimplify: (next: boolean) => void;
   onOpenPerson: (personId: string) => void;
   currentUserId: string;
@@ -31,7 +33,7 @@ interface SettleUpPanelProps {
 }
 
 export default function SettleUpPanel({
-  balances, byPerson, simplified, simplify, isAdmin, onToggleSimplify, onOpenPerson,
+  balances, byPerson, simplified, simplify, isAdmin, advanced, onToggleSimplify, onOpenPerson,
   currentUserId, groupId, groupName, payMethods, onRecorded,
 }: SettleUpPanelProps) {
   const [showAll, setShowAll] = useState(false);
@@ -92,14 +94,16 @@ export default function SettleUpPanel({
 
       <div className="p-4 space-y-3">
         {/* How payments are worked out */}
-        {(byPerson.length > 0 || simplified.length > 0) && (
+        {(advanced || isAdmin) && (byPerson.length > 0 || simplified.length > 0) && (
           <div className="rounded-xl bg-gray-50 px-3 py-2.5">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-gray-900">{simplify ? 'Simplified payments' : 'Pay back by person'}</p>
                 <p className="text-xs text-gray-500">
                   {simplify
-                    ? `${simplified.length} payments instead of ${byPerson.length}. Some people pay someone other than who they owe.`
+                    ? (saved > 0
+                        ? `${simplified.length} payments instead of ${byPerson.length}. Some people pay someone other than who they owe.`
+                        : 'The fewest payments for everyone to be square.')
                     : 'Everyone pays back exactly who paid for them.'}
                 </p>
               </div>
@@ -115,10 +119,16 @@ export default function SettleUpPanel({
                 </button>
               )}
             </div>
+            {simplify && (
+              <p className="text-xs text-gray-500 mt-1.5">
+                Already paid someone back directly, like for a big dinner? Tap <span className="font-medium">Mark paid back</span> on that
+                expense. The plan updates around it.
+              </p>
+            )}
             {!simplify && saved > 0 && (
               <p className="text-xs text-blue-700 mt-1.5">
                 {isAdmin
-                  ? `Turn on Simplify to cut this to ${simplified.length} payments. Best for the final settle-up.`
+                  ? `Turn on Simplify to cut this to ${simplified.length} payments.`
                   : `Your group admin can simplify this to ${simplified.length} payments for the final settle-up.`}
               </p>
             )}
@@ -158,12 +168,12 @@ export default function SettleUpPanel({
             </button>
           </div>
         )}
-        <RecordPayment
+        {advanced && <RecordPayment
           persons={balances.map((b) => ({ id: b.person_id, name: b.user_name }))}
           groupId={groupId}
           currentUserId={currentUserId}
           onRecorded={onRecorded}
-        />
+        />}
         <a href={`/groups/${groupId}/statement`} className="flex items-center justify-center gap-1.5 text-sm font-medium text-blue-600">
           <FileText size={15} /> Check the maths (PDF)
         </a>

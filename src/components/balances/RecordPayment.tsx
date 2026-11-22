@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { HandCoins } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { savePayments } from '@/lib/outbox';
 import { useToast } from '@/components/ui/Toast';
 import { currencySymbol, getActiveCurrency } from '@/lib/utils/balance';
 
@@ -33,13 +34,13 @@ export default function RecordPayment({ persons, groupId, currentUserId, onRecor
     if (!(value > 0)) { toast('Enter an amount', 'error'); return; }
     if (!from || !to || from === to) { toast('Pick two different people', 'error'); return; }
     setSaving(true);
-    const { error } = await createClient().from('settlements').insert({
+    const { error, queued } = await savePayments(createClient(), [{
       group_id: groupId, from_person: from, to_person: to, amount: value, date,
       note: note.trim().slice(0, 200) || null, created_by: currentUserId,
-    });
+    }], 'Payment');
     setSaving(false);
     if (error) { toast(error.message, 'error'); return; }
-    toast('Payment recorded');
+    toast(queued ? 'No signal. It’ll sync when you’re back online.' : 'Payment recorded');
     setAmount(''); setNote(''); setOpen(false);
     onRecorded();
   }
