@@ -121,7 +121,7 @@ export function useSettlements(groupId: string) {
 }
 
 /** Everything needed for my totals across all groups — no row limit, minimal columns. */
-type TotalsExpense = Pick<Expense, 'id' | 'group_id' | 'paid_by' | 'paid_by_pending'> & {
+type TotalsExpense = Pick<Expense, 'id' | 'group_id' | 'paid_by' | 'paid_by_pending' | 'date'> & {
   participants: Pick<ExpenseParticipant, 'user_id' | 'pending_member_id' | 'share_amount'>[];
 };
 
@@ -133,7 +133,7 @@ export function useMyTotals() {
   useEffect(() => {
     async function load() {
       const [{ data: expenses }, { data: payments }] = await Promise.all([
-        supabase.from('expenses').select('id, group_id, paid_by, paid_by_pending, participants:expense_participants(user_id, pending_member_id, share_amount)'),
+        supabase.from('expenses').select('id, group_id, date, paid_by, paid_by_pending, participants:expense_participants(user_id, pending_member_id, share_amount)'),
         supabase.from('settlements').select('group_id, from_person, to_person, amount'),
       ]);
       setData({ expenses: (expenses || []) as unknown as TotalsExpense[], payments: (payments || []) as SettlementRecord[] });

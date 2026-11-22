@@ -63,7 +63,7 @@ export function useGroup(groupId: string) {
         .select(`
           *,
           members:group_members(
-            id, user_id, role, joined_at,
+            *,
             profile:profiles(id, email, full_name, avatar_url, upi_id, pay_methods)
           )
         `)
@@ -72,7 +72,7 @@ export function useGroup(groupId: string) {
       // Separate query so a missing table doesn't break the whole page
       supabase
         .from('pending_members')
-        .select('id, name, email, invite_token, claimed_by, claimed_at, created_at')
+        .select('*')
         .eq('group_id', groupId),
     ]);
 

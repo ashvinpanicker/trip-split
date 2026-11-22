@@ -93,3 +93,5 @@
   }
   .mk a, .mk button, .mk summary, .mk [role='button'] { cursor: pointer; }
 }
+/* A table or figure wider than the text column (comparison tables) */
+.mk .prose .bleed { width: min(68rem, calc(100vw - 2.5rem)); max-width: none; }

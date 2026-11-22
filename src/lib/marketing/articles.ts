@@ -66,6 +66,15 @@ export const ARTICLES: ArticleMeta[] = [
     readMins: 4,
   },
   {
+    path: '/compare',
+    kind: 'guide',
+    title: 'TripSplit vs Splitwise, Settle Up, Tricount and Splid (2026)',
+    description: 'A feature-by-feature comparison of free bill-splitting apps for group trips: limits, currencies, UPI, Hindi, offline, and where each one fits best.',
+    published: '2026-11-22',
+    updated: '2026-11-22',
+    readMins: 5,
+  },
+  {
     path: '/splitwise-alternative',
     kind: 'guide',
     title: 'The free Splitwise alternative with no daily limit',

@@ -127,4 +127,6 @@ export interface ParticipantEntry {
   included: boolean;
   amount: string;
   percentage: string;
+  /** Counts as this many people in an equal split (trip setting, default 1) */
+  weight?: number;
 }

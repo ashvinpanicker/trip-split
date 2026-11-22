@@ -187,7 +187,7 @@ export default function Home() {
           </table>
         </div>
         <p className="mt-3 text-xs text-[var(--ink-soft)]">
-          Splitwise details are from its app store listing and public user reports as of November 2026; Splitwise doesn’t publish its exact free-plan limit. Check splitwise.com for current terms.
+          Splitwise details are from its app store listing and public user reports as of November 2026; Splitwise doesn’t publish its exact free-plan limit. Check splitwise.com for current terms. <Link href="/compare" className="underline underline-offset-4">See how we compare with Settle Up, Tricount and Splid</Link>.
         </p>
       </section>
 

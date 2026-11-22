@@ -4,36 +4,42 @@ import { Languages, Moon, SlidersHorizontal } from 'lucide-react';
 import { useTheme, type Theme } from '@/lib/theme';
 import { useT, setLang, LANGS, type Lang } from '@/lib/i18n';
 import Card from '@/components/ui/Card';
-import { useAdvancedPref, setAdvanced } from '@/hooks/useAdvanced';
+import { FEATURES, setFeatures, useFeatureChoice, withDefaults } from '@/hooks/useFeatures';
+import Switch from '@/components/ui/Switch';
 
-/** App settings that change what you see (per device). */
+/** Optional features, one switch each. Off for friends, on for trip admins until they choose. */
+export function FeaturesCard({ isAdminSomewhere }: { isAdminSomewhere: boolean }) {
+  const t = useT();
+  const choice = useFeatureChoice();
+  const f = withDefaults(choice, isAdminSomewhere);
+  return (
+    <div>
+      <p className="flex items-center gap-1.5 text-xs font-medium text-gray-500 mb-1.5 px-1">
+        <SlidersHorizontal size={13} /> {t('settings.features')}
+      </p>
+      <Card padding="none">
+        {FEATURES.map((k, i) => (
+          <label key={k} className={`flex items-start gap-3 px-4 py-3 cursor-pointer ${i ? 'border-t border-gray-50' : ''}`}>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-900">{t(`feat.${k}` as const)}</p>
+              <p className="text-xs text-gray-500 mt-0.5">{t(`feat.${k}.hint` as const)}</p>
+            </div>
+            <Switch checked={f[k]} onChange={(on) => setFeatures({ [k]: on }, f)} />
+          </label>
+        ))}
+      </Card>
+      {!choice && <p className="text-xs text-gray-500 mt-1.5 px-1">{t('settings.featuresHint')}</p>}
+    </div>
+  );
+}
+
+/** Language and theme (per device). */
 export default function SettingsCard() {
-  const pref = useAdvancedPref();
-  const on = pref ?? false;
   const t = useT();
   const { theme, setTheme } = useTheme();
   return (
     <Card padding="none">
-      <label className="flex items-start gap-3 px-4 py-3 cursor-pointer">
-        <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
-          <SlidersHorizontal size={16} className="text-blue-600" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-gray-900">{t('settings.advanced')}</p>
-          <p className="text-xs text-gray-500 mt-0.5">
-            {t('settings.advancedHint')}
-            {pref === null && t('settings.adminsDefault')}
-          </p>
-        </div>
-        <input
-          type="checkbox"
-          role="switch"
-          checked={on}
-          onChange={(e) => setAdvanced(e.target.checked)}
-          className="mt-1 h-5 w-9 flex-shrink-0 appearance-none rounded-full bg-gray-300 transition-colors checked:bg-blue-600 relative cursor-pointer before:absolute before:top-0.5 before:left-0.5 before:h-4 before:w-4 before:rounded-full before:bg-white before:transition-transform checked:before:translate-x-4"
-        />
-      </label>
-      <div className="flex items-center gap-3 px-4 py-3 border-t border-gray-50">
+      <div className="flex items-center gap-3 px-4 py-3">
         <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
           <Languages size={16} className="text-blue-600" />
         </div>

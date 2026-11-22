@@ -21,8 +21,8 @@ interface SettleUpPanelProps {
   /** Group setting, changed by admins only */
   simplify: boolean;
   isAdmin: boolean;
-  /** Simple mode hides the how-it-works box and manual payments; the maths is the same either way */
-  advanced: boolean;
+  /** "Record payments" feature: manual payments of any amount */
+  canRecord: boolean;
   onToggleSimplify: (next: boolean) => void;
   onOpenPerson: (personId: string) => void;
   currentUserId: string;
@@ -33,7 +33,7 @@ interface SettleUpPanelProps {
 }
 
 export default function SettleUpPanel({
-  balances, byPerson, simplified, simplify, isAdmin, advanced, onToggleSimplify, onOpenPerson,
+  balances, byPerson, simplified, simplify, isAdmin, canRecord, onToggleSimplify, onOpenPerson,
   currentUserId, groupId, groupName, payMethods, onRecorded,
 }: SettleUpPanelProps) {
   const [showAll, setShowAll] = useState(false);
@@ -94,7 +94,7 @@ export default function SettleUpPanel({
 
       <div className="p-4 space-y-3">
         {/* How payments are worked out */}
-        {(advanced || isAdmin) && (byPerson.length > 0 || simplified.length > 0) && (
+        {(canRecord || isAdmin) && (byPerson.length > 0 || simplified.length > 0) && (
           <div className="rounded-xl bg-gray-50 px-3 py-2.5">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
@@ -168,7 +168,7 @@ export default function SettleUpPanel({
             </button>
           </div>
         )}
-        {advanced && <RecordPayment
+        {canRecord && <RecordPayment
           persons={balances.map((b) => ({ id: b.person_id, name: b.user_name }))}
           groupId={groupId}
           currentUserId={currentUserId}

@@ -480,3 +480,12 @@ describe('itemizedShares', () => {
     }
   });
 });
+
+describe('weighted equal split', () => {
+  it('a couple counts as 2 and the total still adds up', () => {
+    const s = computeShares('equal', 1000, [{ key: 'couple', weight: 2 }, { key: 'a' }, { key: 'b' }]);
+    expect(s).toEqual({ couple: 500, a: 250, b: 250 });
+    const odd = computeShares('equal', 100, [{ key: 'x', weight: 2 }, { key: 'y' }, { key: 'z' }, { key: 'w' }]);
+    expect(Object.values(odd).reduce((t, v) => t + Math.round(v * 100), 0)).toBe(10000);
+  });
+});

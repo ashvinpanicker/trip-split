@@ -15,6 +15,7 @@ export default function Footer() {
         </div>
         <div className="grid gap-2 content-start">
           <Link href="/splitwise-alternative" className="hover:text-[var(--blue)]">Free Splitwise alternative</Link>
+          <Link href="/compare" className="hover:text-[var(--blue)]">Compare split apps</Link>
           <Link href="/guides" className="hover:text-[var(--blue)]">Guides</Link>
           <Link href="/guides/split-holiday-trip-expenses" className="hover:text-[var(--blue)]">Holiday trip guide</Link>
           <Link href="/blog" className="hover:text-[var(--blue)]">Blog</Link>

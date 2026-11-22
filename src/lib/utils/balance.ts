@@ -344,11 +344,17 @@ export function itemizedShares(items: BillItem[], extra = 0): { shares: Record<s
   return { shares, subtotal: toRupees(subtotal), total: toRupees(subtotal + extraP) };
 }
 
-export type SplitEntry = { key: string; percentage?: string | number; amount?: string | number };
+/** weight: how many people this entry counts as in an equal split (a couple = 2). Default 1. */
+export type SplitEntry = { key: string; percentage?: string | number; amount?: string | number; weight?: number };
 
 /** Shares (in rupees) for the included people, by split type. */
 export function computeShares(splitType: SplitType, totalAmount: number, entries: SplitEntry[]): Record<string, number> {
-  if (splitType === 'equal') return calculateEqualSplits(totalAmount, entries.map((e) => e.key));
+  if (splitType === 'equal') {
+    // Weighted (someone counts as 2) is a proportional split; otherwise a plain equal one
+    return entries.some((e) => (e.weight ?? 1) !== 1)
+      ? calculatePercentageSplits(totalAmount, Object.fromEntries(entries.map((e) => [e.key, Math.max(0, e.weight ?? 1)])))
+      : calculateEqualSplits(totalAmount, entries.map((e) => e.key));
+  }
   if (splitType === 'percentage') {
     return calculatePercentageSplits(totalAmount, Object.fromEntries(entries.map((e) => [e.key, Number(e.percentage) || 0])));
   }

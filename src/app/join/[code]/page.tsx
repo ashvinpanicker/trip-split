@@ -1,6 +1,6 @@
 'use client';
 
-import { applyAppMode } from '@/hooks/useAdvanced';
+import { applyAppMode } from '@/hooks/useFeatures';
 import GoogleSignIn from '@/components/auth/GoogleSignIn';
 import { useEffect, useRef, useState, use } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';

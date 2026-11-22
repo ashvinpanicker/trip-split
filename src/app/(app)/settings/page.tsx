@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronRight, LogOut, MessageSquare } from 'lucide-react';
 import AppHeader from '@/components/layout/AppHeader';
@@ -8,7 +9,7 @@ import Avatar from '@/components/ui/Avatar';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import PageSkeleton from '@/components/ui/PageSkeleton';
-import SettingsCard from '@/components/profile/SettingsCard';
+import SettingsCard, { FeaturesCard } from '@/components/profile/SettingsCard';
 import SupportLinks from '@/components/SupportLinks';
 import { InstallPrompt, clearOfflineCache } from '@/components/pwa/Pwa';
 import { createClient } from '@/lib/supabase/client';
@@ -21,6 +22,13 @@ export default function SettingsPage() {
   const router = useRouter();
   const { user } = useUser();
   const t = useT();
+  // Trip admins get every feature until they choose, same as on their trip pages
+  const [isAdmin, setIsAdmin] = useState(false);
+  useEffect(() => {
+    if (!user) return;
+    createClient().from('group_members').select('group_id').eq('user_id', user.id).eq('role', 'admin').limit(1)
+      .then(({ data }) => setIsAdmin(!!data?.length));
+  }, [user]);
 
   async function signOut() {
     await createClient().auth.signOut();
@@ -45,6 +53,8 @@ export default function SettingsPage() {
             <ChevronRight size={18} className="text-gray-400" />
           </Link>
         </Card>
+
+        <FeaturesCard isAdminSomewhere={isAdmin} />
 
         <SettingsCard />
 

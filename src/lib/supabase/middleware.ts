@@ -1,7 +1,9 @@
+import { ARTICLES } from '@/lib/marketing/articles';
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
-const MARKETING_PATHS = ['/', '/splitwise-alternative', '/how-to-split-trip-expenses', '/sitemap.xml', '/robots.txt', '/llms.txt', '/sw.js', '/offline.html', '/privacy', '/terms', '/feedback'];
+// Every article is public by being listed in ARTICLES, so a new page can't be locked behind sign-in by mistake
+const MARKETING_PATHS = [...ARTICLES.map((a) => a.path), '/', '/sitemap.xml', '/robots.txt', '/llms.txt', '/sw.js', '/offline.html', '/privacy', '/terms', '/feedback'];
 // Everything under these is public content (guides, blog)
 const MARKETING_PREFIXES = ['/guides', '/blog', '/s'];
 const isMarketing = (p: string) =>

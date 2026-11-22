@@ -15,6 +15,7 @@ import { useUser } from '@/hooks/useUser';
 import { InstallPrompt } from '@/components/pwa/Pwa';
 import { useGroups } from '@/hooks/useGroups';
 import { useAllExpenses, useMyTotals } from '@/hooks/useExpenses';
+import SettleNudges from '@/components/balances/SettleNudges';
 import { formatCurrency, myNetByGroup, totalsByCurrency } from '@/lib/utils/balance';
 import { groupColors } from '@/lib/utils/groupColor';
 
@@ -42,6 +43,12 @@ export default function DashboardPage() {
   const [mainCode, main] = byCurrency[0] ?? ['INR', { owed: 0, owe: 0, net: 0 }];
   const others = byCurrency.slice(1);
   const net = main.net, totalOwed = main.owed, totalOwe = main.owe;
+  const lastExpense: Record<string, string> = {};
+  for (const e of totals.expenses) if (!lastExpense[e.group_id] || e.date > lastExpense[e.group_id]) lastExpense[e.group_id] = e.date;
+  const nudgeTrips = Object.entries(settling)
+    .map(([gid, n]) => ({ g: groups.find((x) => x.id === gid), gid, n }))
+    .filter(({ g }) => g && !archivedIds.has(g.id))
+    .map(({ g, gid, n }) => ({ id: gid, name: g!.name, currency: currencyOf(gid), net: n, lastExpense: lastExpense[gid] }));
 
   return (
     <div className="flex flex-col">
@@ -80,6 +87,8 @@ export default function DashboardPage() {
             </p>
           )}
         </Card>
+
+        <SettleNudges trips={nudgeTrips} />
 
         {/* Groups quick access */}
         {active.length > 0 && (

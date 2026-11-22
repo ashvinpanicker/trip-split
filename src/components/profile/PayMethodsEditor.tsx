@@ -13,7 +13,9 @@ export default function PayMethodsEditor({ userId, initial, legacyUpi }: { userI
   const supabase = createClient();
   const { toast } = useToast();
   const [methods, setMethods] = useState<PayMethod[]>(() => readPayMethods(initial, legacyUpi));
-  const [type, setType] = useState<PayMethodType>('paypal');
+  // UPI first; PayPal, Wise, crypto and the rest one tap away (shown straight away if they already use one)
+  const [more, setMore] = useState(() => methods.some((m) => m.type !== 'upi'));
+  const [type, setType] = useState<PayMethodType>('upi');
   const [value, setValue] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -81,7 +83,7 @@ export default function PayMethodsEditor({ userId, initial, legacyUpi }: { userI
           className="w-full h-11 rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-900"
           aria-label="Payment method"
         >
-          {PAY_METHOD_ORDER.map((t) => (
+          {(more ? PAY_METHOD_ORDER : (['upi'] as PayMethodType[])).map((t) => (
             <option key={t} value={t}>{PAY_METHODS[t].label}</option>
           ))}
         </select>
@@ -102,6 +104,11 @@ export default function PayMethodsEditor({ userId, initial, legacyUpi }: { userI
           </Button>
         </div>
         <p className="text-xs text-gray-400">{def.hint}</p>
+        {!more && (
+          <button type="button" onClick={() => setMore(true)} className="text-xs font-medium text-blue-600">
+            Paid outside India? Add PayPal, Wise, Revolut or others
+          </button>
+        )}
       </div>
     </Card>
   );

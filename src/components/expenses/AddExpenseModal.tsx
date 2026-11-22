@@ -1,6 +1,6 @@
 'use client';
 
-import { paidBackNote } from '@/lib/utils/paidBack';
+import { copayNote, paidBackNote } from '@/lib/utils/paidBack';
 import { enqueue, isOffline, sendPayments } from '@/lib/outbox';
 import { useT } from '@/lib/i18n';
 import { useState, useEffect } from 'react';
@@ -13,7 +13,7 @@ import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import Avatar from '@/components/ui/Avatar';
-import { useAdvanced } from '@/hooks/useAdvanced';
+import { useFeatures } from '@/hooks/useFeatures';
 import { convertSplit, fetchRate, peggedRate, readTripRates } from '@/lib/utils/fx';
 import { useToast } from '@/components/ui/Toast';
 import type { Group, ParticipantEntry, SplitType } from '@/types';
@@ -76,6 +76,8 @@ export default function AddExpenseModal({
   const [notes, setNotes] = useState(expense?.notes ?? '');
   // Card swiped at the restaurant and everyone paid back right there: record it, but nobody owes anything
   const [settledNow, setSettledNow] = useState(false);
+  // Two cards, one bill: someone else paid part of it (saved as their payment to the main payer)
+  const [copay, setCopay] = useState<{ person: string; amount: string } | null>(null);
   // Itemized bill mode (saved as an exact split, with the items kept for re-editing)
   const [itemMode, setItemMode] = useState(!!expense?.items);
   const emptyBill = (): DraftBill => ({ items: [{ name: '', price: '', people: [] }], extra: '' });
@@ -85,10 +87,12 @@ export default function AddExpenseModal({
       : emptyBill()
   );
   const [participants, setParticipants] = useState<ParticipantEntry[]>([]);
-  // Simple by default: equal split; other split types one tap away (or always shown with Advanced on)
-  const advanced = useAdvanced(false);
+  // Simple by default: equal split; other split types one tap away (always shown with "More ways to split")
+  const features = useFeatures(false);
   const [moreSplits, setMoreSplits] = useState(!!expense && (expense.split_type !== 'equal' || !!expense.items));
-  const showSplitTypes = advanced || moreSplits;
+  const showSplitTypes = features.splits || moreSplits;
+  // % is rarely needed: only with "More ways to split" on (or when editing a % split)
+  const splitTypes: SplitType[] = features.splits || expense?.split_type === 'percentage' ? ['equal', 'percentage', 'fixed'] : ['equal', 'fixed'];
 
   // Add person inline
   const [showAddPerson, setShowAddPerson] = useState(false);
@@ -120,12 +124,12 @@ export default function AddExpenseModal({
     async function loadParticipants() {
       const { data: memberData } = await supabase
         .from('group_members')
-        .select('user_id, profile:profiles(id, email, full_name, avatar_url)')
+        .select('*, profile:profiles(id, email, full_name, avatar_url)') // * picks up weight once the trip has it
         .eq('group_id', selectedGroupId);
 
       const { data: pendingData } = await supabase
         .from('pending_members')
-        .select('id, name, email')
+        .select('*')
         .eq('group_id', selectedGroupId)
         .is('claimed_by', null);
 
@@ -140,6 +144,7 @@ export default function AddExpenseModal({
           id: m.user_id,
           name: p?.full_name || p?.email || 'Unknown',
           avatar_url: p?.avatar_url,
+          weight: m.weight ?? 1,
           included: expense ? !!existing : true,
           amount: existing ? (fx0 ? +(existing.share_amount / fx0.rate).toFixed(2) : existing.share_amount).toString() : '',
           percentage: existing?.share_percentage?.toString() ?? '',
@@ -153,6 +158,7 @@ export default function AddExpenseModal({
           type: 'pending',
           id: pm.id,
           name: pm.name,
+          weight: pm.weight ?? 1,
           included: expense ? !!existing : true,
           amount: existing ? (fx0 ? +(existing.share_amount / fx0.rate).toFixed(2) : existing.share_amount).toString() : '',
           percentage: existing?.share_percentage?.toString() ?? '',
@@ -209,7 +215,7 @@ export default function AddExpenseModal({
   }
 
   function splitEntries() {
-    return getIncluded().map((p) => ({ key: p.key, percentage: p.percentage, amount: p.amount }));
+    return getIncluded().map((p) => ({ key: p.key, percentage: p.percentage, amount: p.amount, weight: p.weight }));
   }
 
   function billResult() {
@@ -320,6 +326,14 @@ export default function AddExpenseModal({
         ...(foreign ? { p_fx: { currency: payCur, amount: total, rate: fxRate } } : {}),
       };
       // Card swiped and everyone paid back on the spot: one payment per person, tied to the expense
+      const copayAmount = copay ? Math.round((parseFloat(copay.amount) || 0) * fxRate * 100) / 100 : 0;
+      if (copay && (!copay.person || copay.person === paidBy || !(copayAmount > 0) || copayAmount >= conv.amount)) {
+        throw new Error('Check who else paid and how much (less than the total)');
+      }
+      const copayRows = copay && !isEditing ? [{
+        group_id: selectedGroupId!, from_person: copay.person, to_person: paidBy, amount: copayAmount, date,
+        note: copayNote(title.trim()), created_by: currentUserId,
+      }] : [];
       const paybacks = settledNow && !isEditing
         ? included
             .map((p, k) => ({ p, share: conv.shares[k] }))
@@ -329,18 +343,19 @@ export default function AddExpenseModal({
               note: paidBackNote(title.trim()), created_by: currentUserId,
             }))
         : [];
+      const linked = [...copayRows, ...paybacks];
       const { data: savedId, error } = navigator.onLine
         ? await supabase.rpc('save_expense', args)
         : { data: null, error: { message: 'offline' } };
       if (error && isOffline(error)) {
-        enqueue({ kind: 'expense', groupId: selectedGroupId!, label: title.trim(), amount: conv.amount, args, paybacks });
+        enqueue({ kind: 'expense', groupId: selectedGroupId!, label: title.trim(), amount: conv.amount, args, paybacks: linked });
         toast('No signal. Saved on this phone, it’ll sync when you’re back online.');
         onSuccess?.(); onClose(); resetForm();
         return;
       }
       if (error) throw error;
-      if (paybacks.length && savedId) {
-        const { error: payErr } = await sendPayments(supabase, paybacks.map((r) => ({ ...r, expense_id: savedId as string })));
+      if (linked.length && savedId) {
+        const { error: payErr } = await sendPayments(supabase, linked.map((r) => ({ ...r, expense_id: savedId as string })));
         if (payErr) toast(`Expense saved, but the paybacks didn’t: ${payErr.message}`, 'error');
       }
       if (foreign && keepRate) await supabase.rpc('set_trip_rate', { p_group_id: selectedGroupId, p_currency: payCur, p_rate: fxRate });
@@ -359,7 +374,7 @@ export default function AddExpenseModal({
 
   function resetForm() {
     setTitle(''); setAmount(''); setDate(format(new Date(), 'yyyy-MM-dd'));
-    setPaidBy(''); setSplitType('equal'); setNotes(''); setCategory('food'); setSettledNow(false);
+    setPaidBy(''); setSplitType('equal'); setNotes(''); setCategory('food'); setSettledNow(false); setCopay(null);
     setItemMode(false); setBill(emptyBill());
     setParticipants([]); setShowAddPerson(false); setNewPersonName('');
     if (!initialGroupId) { setStep('group'); setSelectedGroupId(null); }
@@ -510,7 +525,38 @@ export default function AddExpenseModal({
           </div>
         </div>
 
-        {advanced && !isEditing && paidBy && (
+        {features.payments && !isEditing && paidBy && (
+          copay ? (
+            <div className="rounded-xl bg-gray-50 px-3 py-2.5 space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-gray-900">Someone else paid part of it</p>
+                <button type="button" onClick={() => setCopay(null)} className="text-xs text-gray-500">Remove</button>
+              </div>
+              <div className="flex gap-2">
+                <select
+                  value={copay.person}
+                  onChange={(e) => setCopay({ ...copay, person: e.target.value })}
+                  className="flex-1 min-w-0 h-10 rounded-lg border border-gray-200 bg-white px-2 text-sm text-gray-900"
+                >
+                  <option value="">Who?</option>
+                  {participants.filter((m) => m.id !== paidBy).map((m) => <option key={m.key} value={m.id}>{m.id === currentUserId ? t('you') : m.name}</option>)}
+                </select>
+                <input
+                  type="number" inputMode="decimal" step="0.01" min="0" placeholder="How much"
+                  value={copay.amount}
+                  onChange={(e) => setCopay({ ...copay, amount: e.target.value })}
+                  className="w-28 h-10 rounded-lg border border-gray-200 bg-white px-2 text-sm text-gray-900"
+                />
+              </div>
+            </div>
+          ) : (
+            <button type="button" onClick={() => setCopay({ person: '', amount: '' })} className="text-sm font-medium text-blue-600 -mt-2">
+              + Someone else paid part of it
+            </button>
+          )
+        )}
+
+        {features.payments && !isEditing && paidBy && (
           <label className="flex items-start gap-2.5 rounded-xl bg-gray-50 px-3 py-2.5 cursor-pointer">
             <input type="checkbox" checked={settledNow} onChange={(e) => setSettledNow(e.target.checked)} className="mt-0.5 h-4 w-4 accent-blue-600" />
             <span className="min-w-0">
@@ -534,7 +580,7 @@ export default function AddExpenseModal({
         <div>
           <label className="text-sm font-medium text-gray-700 mb-2 block">{t('add.splitType')}</label>
           <div className="flex gap-2">
-            {(['equal', 'percentage', 'fixed'] as SplitType[]).map((type) => (
+            {splitTypes.map((type) => (
               <button
                 key={type}
                 type="button"
@@ -564,6 +610,12 @@ export default function AddExpenseModal({
             </button>
           </div>
         </div>
+        )}
+
+        {!itemMode && splitType === 'equal' && getIncluded().some((p) => (p.weight ?? 1) > 1) && (
+          <p className="text-xs text-gray-500 -mt-2">
+            {getIncluded().filter((p) => (p.weight ?? 1) > 1).map((p) => `${p.name.split(' ')[0]} counts as ${p.weight}`).join(', ')} (trip setting)
+          </p>
         )}
 
         {/* Participants */}

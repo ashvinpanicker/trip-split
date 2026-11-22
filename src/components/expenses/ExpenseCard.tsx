@@ -26,9 +26,11 @@ interface ExpenseCardProps {
   group?: { id: string; name: string; color?: GroupColor };
   /** People who've already paid the payer back for this expense */
   paidBack?: Set<string>;
+  /** Others who paid part of the bill, with how much */
+  copays?: { person: string; amount: number }[];
 }
 
-export default function ExpenseCard({ expense, currentUserId, onDelete, onUpdate, currency, group, paidBack }: ExpenseCardProps) {
+export default function ExpenseCard({ expense, currentUserId, onDelete, onUpdate, currency, group, paidBack, copays }: ExpenseCardProps) {
   const gc = group ? group.color ?? groupColor(group.id) : null;
   const { toast } = useToast();
   const supabase = createClient();
@@ -43,6 +45,12 @@ export default function ExpenseCard({ expense, currentUserId, onDelete, onUpdate
     ? t('you')
     : payer?.full_name || payer?.email || expense.payer_pending?.name || 'Unknown';
   const payerId = payerIdOf(expense);
+  const nameIn = (id: string) => {
+    if (id === currentUserId) return t('you');
+    const p = expense.participants?.find((x) => (x.user_id ?? x.pending_member_id) === id);
+    const prof = p?.profile as { full_name?: string; email?: string } | undefined;
+    return prof?.full_name || prof?.email || p?.pending_member?.name || t('someone');
+  };
   const isMyExpense = expense.paid_by === currentUserId;
   const cat = categoryOf(expense.category);
 
@@ -125,6 +133,11 @@ export default function ExpenseCard({ expense, currentUserId, onDelete, onUpdate
                 <p className="text-xs text-gray-500 mt-0.5">
                   {t('exp.paid', { date: format(new Date(expense.date), 'MMM d'), name: payerName })}
                 </p>
+                {copays?.map((c) => (
+                  <p key={c.person} className="text-xs text-gray-500">
+                    + {nameIn(c.person)} paid {formatCurrency(c.amount, currency)} of it
+                  </p>
+                ))}
               </div>
               <div className="flex items-center gap-1 flex-shrink-0">
                 <div className="text-right">

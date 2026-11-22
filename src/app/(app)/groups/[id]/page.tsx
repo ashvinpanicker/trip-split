@@ -2,7 +2,7 @@
 
 import PageSkeleton from '@/components/ui/PageSkeleton';
 import { useT } from '@/lib/i18n';
-import { useState, use, useMemo } from 'react';
+import { useState, use, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Plus, Users, Receipt, Copy, Check, Trash2, History, Search, Download } from 'lucide-react';
 import { format } from 'date-fns';
@@ -30,10 +30,10 @@ import { useExpenses, useSettlements } from '@/hooks/useExpenses';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/components/ui/Toast';
 import { useUser } from '@/hooks/useUser';
-import { useAdvancedPref } from '@/hooks/useAdvanced';
+import { useFeatureChoice, withDefaults } from '@/hooks/useFeatures';
 import { setActiveCurrency, calculateGroupBalances, smartSettle, directDebts, formatCurrency, categoryOf, type BalancePerson } from '@/lib/utils/balance';
 import type { Expense, ExpenseParticipant } from '@/types';
-import { paidBackMap } from '@/lib/utils/paidBack';
+import { copaysByExpense, paidBackMap } from '@/lib/utils/paidBack';
 import { motion } from 'motion/react';
 import { PendingChanges, useOutbox } from '@/components/pwa/Sync';
 import { enter, spring } from '@/lib/motion';
@@ -65,6 +65,11 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
   const { settlements: payments, refetch: refetchPayments } = useSettlements(id);
   const { toast } = useToast();
   const [tab, setTab] = useState<Tab>('expenses');
+  // Links like /groups/…?tab=balances (reminders, "Pay now") open straight on that tab
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get('tab');
+    if (t === 'balances' || t === 'stats') setTab(t);
+  }, []);
   const [showAddExpense, setShowAddExpense] = useState(false);
   const [personId, setPersonId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
@@ -79,9 +84,10 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
     () => [...payments, ...queued.flatMap((o) => (o.kind === 'payments' ? o.rows : []))],
     [payments, queued]
   );
+  const featureChoice = useFeatureChoice();
   const paidBack = useMemo(() => paidBackMap(counted, expenses), [counted, expenses]);
-  // null = no saved choice yet (admins then see advanced features)
-  const advancedPref = useAdvancedPref();
+  const copays = useMemo(() => copaysByExpense(counted), [counted]);
+
   const t = useT();
 
   if (groupLoading) {
@@ -120,7 +126,7 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
   const settlements = smartSettle(balances, directPlan);
   const myRole = (group.members || []).find((m: any) => m.user_id === user.id)?.role;
   const isAdmin = myRole === 'admin';
-  const advanced = advancedPref ?? isAdmin;
+  const features = withDefaults(featureChoice, isAdmin);
   const simplify = !!group.simplify_debts;
   const adminCount = (group.members || []).filter((m: any) => m.role === 'admin').length;
 
@@ -132,7 +138,7 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
     ...(trackOnly ? [] : [{ key: 'balances' as Tab, label: t('trip.tab.balances') }]),
     { key: 'stats' as Tab, label: t('trip.tab.stats') },
   ];
-  const view = (trackOnly && tab === 'balances') || (!advanced && tab === 'activity') ? 'expenses' : tab;
+  const view = (trackOnly && tab === 'balances') || (!features.activity && tab === 'activity') ? 'expenses' : tab;
   const myPaid = stats.paidUpfront.find((p) => p.id === user.id)?.total ?? 0;
   const shown = filterExpenses(expenses, { query, category: catFilter, payer: payerFilter });
 
@@ -185,6 +191,23 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
     if (error) toast(/rename_pending/.test(error.message) ? 'Renaming needs a quick database update' : error.message, 'error');
     else { toast('Renamed'); refetchGroup(); changed(); }
   }
+  async function setWeight(personId: string, weight: number) {
+    const { error } = await createClient().rpc('set_weight', { p_group_id: id, p_person_id: personId, p_weight: weight });
+    if (error) toast(/set_weight/.test(error.message) ? 'This needs a quick database update' : error.message, 'error');
+    else { toast(weight > 1 ? `Counts as ${weight} in equal splits` : 'Counts as 1'); refetchGroup(); }
+  }
+  // "Counts as 2": a couple or family sharing one spot in equal splits. Admins change it; everyone sees it.
+  const weightControl = (personId: string, weight = 1) =>
+    isAdmin ? (
+      <select
+        aria-label="Counts as"
+        value={weight}
+        onChange={(e) => setWeight(personId, Number(e.target.value))}
+        className="h-7 rounded-md border border-gray-200 bg-white px-1 text-xs text-gray-700"
+      >
+        {[1, 2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>{n === 1 ? '1 person' : `Counts as ${n}`}</option>)}
+      </select>
+    ) : weight > 1 ? <span className="text-xs text-gray-500">counts as {weight}</span> : null;
   async function setRole(userId: string, role: 'admin' | 'member') {
     const { error } = await createClient().rpc('set_member_role', { p_group_id: id, p_user_id: userId, p_role: role });
     if (error) toast(error.message, 'error');
@@ -221,7 +244,7 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
             {([
               { key: 'members', label: `${t('trip.people')} (${allPersons.length})`, icon: Users, badge: allPersons.length },
               { key: 'activity', label: t('trip.activity'), icon: History, badge: 0 },
-            ] as const).filter((b) => advanced || b.key !== 'activity').map(({ key, label, icon: Icon, badge }) => (
+            ] as const).filter((b) => features.activity || b.key !== 'activity').map(({ key, label, icon: Icon, badge }) => (
               <button
                 key={key}
                 onClick={() => setTab(tab === key ? 'expenses' : key)}
@@ -380,9 +403,10 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
                   onDelete={changed}
                   onUpdate={changed}
                   paidBack={paidBack.get(expense.id) ?? EMPTY}
+                  copays={copays.get(expense.id)}
                 />
               ))}
-              {advanced && <button onClick={exportCsv} className="w-full flex items-center justify-center gap-2 h-10 rounded-xl border border-gray-200 bg-white text-sm font-medium text-gray-700">
+              {features.export && <button onClick={exportCsv} className="w-full flex items-center justify-center gap-2 h-10 rounded-xl border border-gray-200 bg-white text-sm font-medium text-gray-700">
                 <Download size={15} /> Export expenses (CSV)
               </button>}
             </>
@@ -400,7 +424,7 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
               simplified={settlements}
               byPerson={directPlan}
               simplify={simplify}
-              advanced={advanced}
+              canRecord={features.payments}
               isAdmin={isAdmin}
               onToggleSimplify={toggleSimplify}
               onOpenPerson={setPersonId}
@@ -488,6 +512,7 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${m.role === 'admin' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
                         {m.role}
                       </span>
+                      {weightControl(m.user_id, m.weight)}
                       {isAdmin && m.user_id !== user.id && (m.role === 'member' || adminCount > 1) && (
                         <button
                           onClick={() => setRole(m.user_id, m.role === 'admin' ? 'member' : 'admin')}
@@ -535,7 +560,10 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
                               </p>
                             </div>
                           )}
-                          <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">pending</span>
+                          <div className="flex flex-col items-end gap-1 shrink-0">
+                            <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">pending</span>
+                            {weightControl(pm.id, pm.weight)}
+                          </div>
                         </div>
                         <div className="mt-2 flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
                           <p className="text-xs text-gray-500 flex-1 min-w-0 truncate">{inviteUrl}</p>
