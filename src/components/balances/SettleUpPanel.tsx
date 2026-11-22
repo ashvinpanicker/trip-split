@@ -2,11 +2,13 @@
 
 import type { PayMethod } from '@/lib/utils/payMethods';
 import { useMemo, useState } from 'react';
-import { ChevronDown, Share2 } from 'lucide-react';
+import { Check, ChevronDown, Copy, FileText, Share2 } from 'lucide-react';
+import { format } from 'date-fns';
+import AddUpiInline from './AddUpiInline';
 import Card from '@/components/ui/Card';
 import BalanceList from './BalanceList';
 import SettlementList from './SettlementList';
-import { formatCurrency } from '@/lib/utils/balance';
+import { formatCurrency, getActiveCurrency } from '@/lib/utils/balance';
 import type { Balance, Settlement } from '@/types';
 
 interface SettleUpPanelProps {
@@ -48,9 +50,21 @@ export default function SettleUpPanel({
   const owedToMe = plan.filter((s) => s.to_id === currentUserId);
   const saved = byPerson.length - simplified.length;
 
+  // UPI ID next to each payee, so people can pay straight from the WhatsApp message
+  const upiOf = (id: string) => payMethods?.[id]?.find((m) => m.type === 'upi')?.value;
   function shareText() {
-    const lines = plan.map((s) => `• ${s.from_name} → ${s.to_name}: ${formatCurrency(s.amount)}`);
-    return `💸 ${groupName}: settle up (${plan.length} payment${plan.length === 1 ? '' : 's'})\n\n${lines.join('\n')}\n\nDetails: ${window.location.origin}/groups/${groupId}`;
+    const lines = plan.map((s) => {
+      const upi = upiOf(s.to_id);
+      return `• ${s.from_name} → ${s.to_name}: ${formatCurrency(s.amount)}${upi ? ` (UPI: ${upi})` : ''}`;
+    });
+    const when = format(new Date(), 'd MMM, h:mm a');
+    return `💸 ${groupName}: settle up (${plan.length} payment${plan.length === 1 ? '' : 's'})\nUpdated ${when}\n\n${lines.join('\n')}\n\n` +
+      `Check the maths: ${window.location.origin}/groups/${groupId}/statement`;
+  }
+  const [copied, setCopied] = useState(false);
+  async function copyText() {
+    try { await navigator.clipboard.writeText(shareText()); setCopied(true); setTimeout(() => setCopied(false), 2000); }
+    catch { prompt('Copy the message:', shareText()); }
   }
 
   return (
@@ -109,6 +123,10 @@ export default function SettleUpPanel({
           </div>
         )}
 
+        {owedToMe.length > 0 && !upiOf(currentUserId) && getActiveCurrency() === 'INR' && (
+          <AddUpiInline userId={currentUserId} existing={payMethods?.[currentUserId] ?? []} onSaved={() => location.reload()} />
+        )}
+
         <SettlementList
           settlements={sorted}
           currentUserId={currentUserId}
@@ -121,15 +139,26 @@ export default function SettleUpPanel({
         />
 
         {plan.length > 0 && (
-          <a
-            href={`https://wa.me/?text=${encodeURIComponent(typeof window !== 'undefined' ? shareText() : '')}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 h-10 rounded-xl bg-[#25D366] text-white text-sm font-semibold"
-          >
-            <Share2 size={16} /> Share plan on WhatsApp
-          </a>
+          <div className="flex gap-2">
+            <a
+              href={`https://wa.me/?text=${encodeURIComponent(typeof window !== 'undefined' ? shareText() : '')}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 flex items-center justify-center gap-2 h-10 rounded-xl bg-[#25D366] text-white text-sm font-semibold"
+            >
+              <Share2 size={16} /> Share on WhatsApp
+            </a>
+            <button
+              onClick={copyText}
+              className="flex items-center justify-center gap-1.5 h-10 px-4 rounded-xl border border-gray-200 bg-white text-sm font-medium text-gray-700"
+            >
+              {copied ? <Check size={15} /> : <Copy size={15} />} {copied ? 'Copied' : 'Copy'}
+            </button>
+          </div>
         )}
+        <a href={`/groups/${groupId}/statement`} className="flex items-center justify-center gap-1.5 text-sm font-medium text-blue-600">
+          <FileText size={15} /> Check the maths (PDF)
+        </a>
       </div>
 
       {/* Everyone's balance, collapsed by default; tap a person for the breakdown */}

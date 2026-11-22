@@ -2,7 +2,8 @@
 
 import { useT } from '@/lib/i18n';
 import { useEffect, useState } from 'react';
-import { ArrowRight, Check, Copy, ExternalLink, MessageCircle } from 'lucide-react';
+import { ArrowRight, Check, Copy, ExternalLink, MessageCircle, QrCode } from 'lucide-react';
+import UpiQr from './UpiQr';
 import Avatar from '@/components/ui/Avatar';
 import { useToast } from '@/components/ui/Toast';
 import { createClient } from '@/lib/supabase/client';
@@ -31,6 +32,7 @@ export default function SettlementList({
   const { toast } = useToast();
   const t = useT();
   const [savingIdx, setSavingIdx] = useState<number | null>(null);
+  const [qrIdx, setQrIdx] = useState<number | null>(null);
   // Personal "your balance" links (no sign-in) for people who owe you; falls back to the trip page
   const [links, setLinks] = useState<Record<string, string>>({});
   const debtorKey = settlements.filter((x) => x.to_id === currentUserId).map((x) => x.from_id).sort().join(',');
@@ -51,7 +53,7 @@ export default function SettlementList({
   async function copyAddress(label: string, value: string) {
     try {
       await navigator.clipboard.writeText(value);
-      toast(`Copied ${label} address. Check the network before sending.`);
+      toast(label === 'UPI' ? 'Copied UPI ID' : `Copied ${label} address. Check the network before sending.`);
     } catch {
       prompt(`Copy ${label} address:`, value);
     }
@@ -97,6 +99,12 @@ export default function SettlementList({
         const actions = isYouPaying
           ? payActions(payMethods[s.to_id] ?? [], s.amount, getActiveCurrency(), `${groupName ?? 'TripSplit'} settle-up`, s.to_name)
           : [];
+        // UPI ID as text too: on iPhones the pay link often can't pick an app, so people paste the ID instead
+        const payeeUpi = isYouPaying ? actions.find((a) => a.type === 'upi')?.value : undefined;
+        // When you're owed: a QR of your own UPI with the amount, for the other person to scan
+        const myUpiLink = isYouReceiving
+          ? payActions((payMethods[currentUserId] ?? []).filter((m) => m.type === 'upi'), s.amount, getActiveCurrency(), `${groupName ?? 'TripSplit'} settle-up`, s.to_name)[0]?.href
+          : undefined;
 
         return (
           <div
@@ -177,7 +185,23 @@ export default function SettlementList({
                     )}
                   </div>
                 )}
+                {payeeUpi && (
+                  <button onClick={() => copyAddress('UPI', payeeUpi)} className="w-full text-xs text-gray-600 text-left">
+                    UPI ID: <span className="font-medium text-gray-900">{payeeUpi}</span> · <span className="text-blue-600 font-medium">Copy</span>
+                  </button>
+                )}
+                {myUpiLink && qrIdx === i && (
+                  <UpiQr link={myUpiLink} label={`Scan with any UPI app to pay ${formatCurrency(s.amount)}`} />
+                )}
               <div className="flex gap-2">
+                {myUpiLink && (
+                  <button
+                    onClick={() => setQrIdx(qrIdx === i ? null : i)}
+                    className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-lg bg-white border border-blue-200 text-blue-700 text-sm font-medium"
+                  >
+                    <QrCode size={14} /> {qrIdx === i ? 'Hide QR' : 'Show QR'}
+                  </button>
+                )}
                 {isYouReceiving && (
                   <a
                     href={`https://wa.me/?text=${encodeURIComponent(remindText(s))}`}

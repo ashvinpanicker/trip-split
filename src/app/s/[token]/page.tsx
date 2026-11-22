@@ -116,6 +116,12 @@ export default function BalanceLinkPage({ params }: { params: Promise<{ token: s
                 ))}
               </div>
             )}
+            {paying && actions.find((a) => a.type === 'upi') && (
+              <button onClick={() => copy(actions.find((a) => a.type === 'upi')!.value)} className="mt-2 w-full text-left text-xs text-gray-600">
+                UPI ID: <span className="font-medium text-gray-900">{actions.find((a) => a.type === 'upi')!.value}</span> ·{' '}
+                <span className="text-blue-600 font-medium">{copied === actions.find((a) => a.type === 'upi')!.value ? '✓' : 'Copy'}</span>
+              </button>
+            )}
             {paying && actions.length === 0 && (
               <p className="mt-2 text-xs text-gray-500">{t('link.noMethod', { name: first(other) })}</p>
             )}
@@ -127,6 +133,9 @@ export default function BalanceLinkPage({ params }: { params: Promise<{ token: s
         <p className="text-xs text-gray-500 text-center">{t('link.after')}</p>
       )}
 
+      <p className="text-center text-sm">
+        <a href={`/s/${token}/statement`} className="font-medium text-blue-600">Check the maths (PDF)</a>
+      </p>
       <p className="text-center text-xs pt-2">
         <button onClick={() => setLang(t.lang === 'hi' ? 'en' : 'hi')} className="text-blue-600 underline">
           {t.lang === 'hi' ? 'English' : 'हिन्दी में देखें'}
