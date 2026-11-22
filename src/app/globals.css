@@ -18,6 +18,8 @@
 @media (prefers-color-scheme: dark) {
   html:not(:has(.mk)) {
     color-scheme: dark; /* native inputs, date pickers, scrollbars and Safari's top bar go dark too */
+    --background: #0b111c;
+    --foreground: #f2f4f7; /* default text, e.g. inputs without their own colour */
     background-color: #0b111c;
     --color-gray-50: #0b111c;
     --color-gray-100: #1a2230;

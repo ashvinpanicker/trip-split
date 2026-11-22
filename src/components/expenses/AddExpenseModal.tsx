@@ -584,7 +584,7 @@ export default function AddExpenseModal({
                         type="number"
                         value={p.percentage}
                         onChange={(e) => updateParticipant(p.key, 'percentage', e.target.value)}
-                        className="w-16 text-sm border border-gray-200 rounded-lg px-2 py-1 text-right"
+                        className="w-16 text-sm border border-gray-200 rounded-lg px-2 py-1 text-right bg-white text-gray-900"
                         placeholder="0"
                         min="0" max="100" step="0.1"
                       />
@@ -598,7 +598,7 @@ export default function AddExpenseModal({
                         type="number"
                         value={p.amount}
                         onChange={(e) => updateParticipant(p.key, 'amount', e.target.value)}
-                        className="w-20 text-sm border border-gray-200 rounded-lg px-2 py-1 text-right"
+                        className="w-20 text-sm border border-gray-200 rounded-lg px-2 py-1 text-right bg-white text-gray-900"
                         placeholder="0.00"
                         min="0" step="0.01"
                       />
