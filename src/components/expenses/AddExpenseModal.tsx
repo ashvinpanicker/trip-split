@@ -1,6 +1,7 @@
 'use client';
 
 import { copayNote, paidBackNote } from '@/lib/utils/paidBack';
+import { memberName } from '@/lib/utils/people';
 import { enqueue, isOffline, sendPayments } from '@/lib/outbox';
 import { useT } from '@/lib/i18n';
 import { useState, useEffect } from 'react';
@@ -142,7 +143,7 @@ export default function AddExpenseModal({
           key: `u:${m.user_id}`,
           type: 'user',
           id: m.user_id,
-          name: p?.full_name || p?.email || 'Unknown',
+          name: memberName({ nickname: m.nickname, profile: p }),
           avatar_url: p?.avatar_url,
           weight: m.weight ?? 1,
           included: expense ? !!existing : true,

@@ -51,7 +51,7 @@ as $$
     'person_id', l.person_id,
     'group', json_build_object('id', g.id, 'name', g.name, 'currency', g.currency, 'simplify_debts', g.simplify_debts),
     'members', coalesce((
-      select json_agg(json_build_object('id', p.id, 'name', coalesce(p.full_name, split_part(p.email, '@', 1)),
+      select json_agg(json_build_object('id', p.id, 'name', coalesce(m.nickname, p.full_name, split_part(p.email, '@', 1)),
                                         'pay_methods', p.pay_methods, 'upi_id', p.upi_id))
       from group_members m join profiles p on p.id = m.user_id where m.group_id = g.id), '[]'),
     'pending', coalesce((

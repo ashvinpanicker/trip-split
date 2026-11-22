@@ -26,11 +26,13 @@ interface ExpenseCardProps {
   group?: { id: string; name: string; color?: GroupColor };
   /** People who've already paid the payer back for this expense */
   paidBack?: Set<string>;
+  /** Names as this trip shows them (admin nicknames), by person id */
+  names?: Record<string, string>;
   /** Others who paid part of the bill, with how much */
   copays?: { person: string; amount: number }[];
 }
 
-export default function ExpenseCard({ expense, currentUserId, onDelete, onUpdate, currency, group, paidBack, copays }: ExpenseCardProps) {
+export default function ExpenseCard({ expense, currentUserId, onDelete, onUpdate, currency, group, paidBack, copays, names }: ExpenseCardProps) {
   const gc = group ? group.color ?? groupColor(group.id) : null;
   const { toast } = useToast();
   const supabase = createClient();
@@ -43,13 +45,13 @@ export default function ExpenseCard({ expense, currentUserId, onDelete, onUpdate
   const payer = expense.payer as any;
   const payerName = payer?.id === currentUserId
     ? t('you')
-    : payer?.full_name || payer?.email || expense.payer_pending?.name || 'Unknown';
+    : (payerIdOf(expense) && names?.[payerIdOf(expense)!]) || payer?.full_name || payer?.email || expense.payer_pending?.name || 'Unknown';
   const payerId = payerIdOf(expense);
   const nameIn = (id: string) => {
     if (id === currentUserId) return t('you');
     const p = expense.participants?.find((x) => (x.user_id ?? x.pending_member_id) === id);
     const prof = p?.profile as { full_name?: string; email?: string } | undefined;
-    return prof?.full_name || prof?.email || p?.pending_member?.name || t('someone');
+    return names?.[id] || prof?.full_name || prof?.email || p?.pending_member?.name || t('someone');
   };
   const isMyExpense = expense.paid_by === currentUserId;
   const cat = categoryOf(expense.category);
@@ -217,8 +219,8 @@ export default function ExpenseCard({ expense, currentUserId, onDelete, onUpdate
             <div className="space-y-2">
               {(expense.participants ?? []).map((p) => {
                 const profile = p.profile as any;
-                const name = profile?.full_name || profile?.email || p.pending_member?.name || 'Unknown';
                 const pid = p.user_id ?? p.pending_member_id;
+                const name = (pid && names?.[pid]) || profile?.full_name || profile?.email || p.pending_member?.name || 'Unknown';
                 return (
                   <div key={pid ?? p.id} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">

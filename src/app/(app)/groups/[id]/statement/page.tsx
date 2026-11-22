@@ -1,5 +1,6 @@
 'use client';
 
+import { tripPersons } from '@/lib/utils/people';
 import { use } from 'react';
 import Statement from '@/components/balances/Statement';
 import { useGroup } from '@/hooks/useGroups';
@@ -22,10 +23,7 @@ export default function StatementPage({ params }: { params: Promise<{ id: string
   }
   const currency = group.currency || 'INR';
   setActiveCurrency(currency);
-  const persons: BalancePerson[] = [
-    ...(group.members || []).map((m: any) => ({ id: m.user_id, name: m.profile?.full_name || m.profile?.email || 'Unknown' })),
-    ...(group.pending_members || []).filter((pm: any) => !pm.claimed_by).map((pm: any) => ({ id: pm.id, name: pm.name, is_pending: true })),
-  ];
+  const persons = tripPersons(group);
   const exps = expenses.filter((e) => e.participants) as (Expense & { participants: ExpenseParticipant[] })[];
   const balances = calculateGroupBalances(exps, persons, payments);
   const direct = directDebts(exps, persons, payments);

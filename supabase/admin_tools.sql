@@ -1,33 +1,27 @@
--- Trip admin tools. Run after paid_back.sql. Safe to run twice.
+-- Trip admin tools: edit a person (name or nickname, and who they pay for). Safe to run twice.
+-- Run before balance_links.sql (its no-sign-in page shows nicknames).
 
--- 1. Rename someone who hasn't joined yet (a typo, or "Jose" → "Joseph").
-create or replace function public.rename_pending(p_pending_id uuid, p_name text)
-returns void language plpgsql security definer set search_path = public as $$
-declare g uuid;
-begin
-  select group_id into g from pending_members where id = p_pending_id and claimed_by is null;
-  if g is null then raise exception 'That person has already joined or doesn''t exist'; end if;
-  if not is_group_admin(g) then raise exception 'Only trip admins can rename people'; end if;
-  if length(trim(coalesce(p_name, ''))) not between 1 and 60 then raise exception 'Name must be 1 to 60 characters'; end if;
-  update pending_members set name = trim(p_name) where id = p_pending_id;
-end;
-$$;
-grant execute on function public.rename_pending(uuid, text) to authenticated;
-
--- 2. Weights: a couple or a family can count as 2+ in equal splits.
+-- Nickname: what the trip calls someone who has joined ("Jose" for "Joseph Jose"). Their own name stays theirs.
+alter table public.group_members add column if not exists nickname text check (length(nickname) between 1 and 60);
+-- Pays for: a couple or family paying as one counts as 2+ in equal splits. Default 1.
 alter table public.group_members   add column if not exists weight smallint not null default 1 check (weight between 1 and 9);
 alter table public.pending_members add column if not exists weight smallint not null default 1 check (weight between 1 and 9);
 
-create or replace function public.set_weight(p_group_id uuid, p_person_id uuid, p_weight int)
+-- One admin action for both kinds of person. Empty name = clear the nickname (joined) / not allowed (not joined).
+create or replace function public.update_person(p_group_id uuid, p_person_id uuid, p_name text, p_weight int)
 returns void language plpgsql security definer set search_path = public as $$
+declare n text := nullif(trim(coalesce(p_name, '')), '');
 begin
-  if not is_group_admin(p_group_id) then raise exception 'Only trip admins can change this'; end if;
-  if p_weight not between 1 and 9 then raise exception 'Counts as 1 to 9 people'; end if;
-  update group_members set weight = p_weight where group_id = p_group_id and user_id = p_person_id;
-  if not found then
-    update pending_members set weight = p_weight where group_id = p_group_id and id = p_person_id;
-    if not found then raise exception 'That person isn''t in this trip'; end if;
-  end if;
+  if not is_group_admin(p_group_id) then raise exception 'Only trip admins can edit people'; end if;
+  if p_weight not between 1 and 9 then raise exception 'Pays for 1 to 9 people'; end if;
+  if length(n) > 60 then raise exception 'Name must be 60 characters or fewer'; end if;
+  update group_members set nickname = n, weight = p_weight where group_id = p_group_id and user_id = p_person_id;
+  if found then return; end if;
+  if n is null then raise exception 'Name can''t be empty'; end if;
+  update pending_members set name = n, weight = p_weight
+   where group_id = p_group_id and id = p_person_id and claimed_by is null;
+  if not found then raise exception 'That person isn''t in this trip'; end if;
 end;
 $$;
-grant execute on function public.set_weight(uuid, uuid, int) to authenticated;
+grant execute on function public.update_person(uuid, uuid, text, int) to authenticated;
+

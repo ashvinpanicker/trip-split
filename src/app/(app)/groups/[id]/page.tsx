@@ -31,11 +31,13 @@ import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/components/ui/Toast';
 import { useUser } from '@/hooks/useUser';
 import { useFeatureChoice, withDefaults } from '@/hooks/useFeatures';
-import { setActiveCurrency, calculateGroupBalances, smartSettle, directDebts, formatCurrency, categoryOf, type BalancePerson } from '@/lib/utils/balance';
+import { setActiveCurrency, calculateGroupBalances, smartSettle, directDebts, formatCurrency, categoryOf } from '@/lib/utils/balance';
 import type { Expense, ExpenseParticipant } from '@/types';
 import { copaysByExpense, paidBackMap } from '@/lib/utils/paidBack';
 import { motion } from 'motion/react';
 import { PendingChanges, useOutbox } from '@/components/pwa/Sync';
+import EditPersonSheet, { type EditablePerson } from '@/components/groups/EditPersonSheet';
+import { memberName, tripPersons } from '@/lib/utils/people';
 import { enter, spring } from '@/lib/motion';
 
 const EMPTY = new Set<string>();
@@ -75,7 +77,7 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
   const [query, setQuery] = useState('');
   const [catFilter, setCatFilter] = useState<string | null>(null);
   const [payerFilter, setPayerFilter] = useState<string | null>(null);
-  const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
+  const [editing, setEditing] = useState<EditablePerson | null>(null);
   // One signal for "something changed": expenses, totals and the activity feed all reload on it
   const changed = () => window.dispatchEvent(new Event('tripsplit:expenses-changed'));
   // Payments saved offline count straight away, so nobody taps "Mark paid" twice
@@ -104,16 +106,9 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
   // Everything below formats money in this trip's currency (symbol only, no conversion)
   setActiveCurrency(group.currency);
 
-  const realMembers: BalancePerson[] = (group.members || []).map((m: any) => {
-    const p = m.profile as any;
-    return { id: m.user_id, name: p?.full_name || p?.email || 'Unknown', avatar_url: p?.avatar_url };
-  });
-
-  const pendingMembers: BalancePerson[] = (group.pending_members || [])
-    .filter((pm: any) => !pm.claimed_by)
-    .map((pm: any) => ({ id: pm.id, name: pm.name, is_pending: true }));
-
-  const allPersons = [...realMembers, ...pendingMembers];
+  const allPersons = tripPersons(group);
+  const pendingCount = allPersons.filter((p) => p.is_pending).length;
+  const names = Object.fromEntries(allPersons.map((p) => [p.id, p.name]));
   const nameOf = (pid: string) =>
     pid === user.id ? t('you') : allPersons.find((p) => p.id === pid)?.name ?? t('someone');
 
@@ -183,31 +178,6 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
     else { toast(next ? 'Payments simplified for everyone' : 'Back to paying by person'); refetchGroup(); }
   }
 
-  async function renamePending(pendingId: string, current: string) {
-    const name = renaming?.name.trim();
-    setRenaming(null);
-    if (!name || name === current) return;
-    const { error } = await createClient().rpc('rename_pending', { p_pending_id: pendingId, p_name: name });
-    if (error) toast(/rename_pending/.test(error.message) ? 'Renaming needs a quick database update' : error.message, 'error');
-    else { toast('Renamed'); refetchGroup(); changed(); }
-  }
-  async function setWeight(personId: string, weight: number) {
-    const { error } = await createClient().rpc('set_weight', { p_group_id: id, p_person_id: personId, p_weight: weight });
-    if (error) toast(/set_weight/.test(error.message) ? 'This needs a quick database update' : error.message, 'error');
-    else { toast(weight > 1 ? `Counts as ${weight} in equal splits` : 'Counts as 1'); refetchGroup(); }
-  }
-  // "Counts as 2": a couple or family sharing one spot in equal splits. Admins change it; everyone sees it.
-  const weightControl = (personId: string, weight = 1) =>
-    isAdmin ? (
-      <select
-        aria-label="Counts as"
-        value={weight}
-        onChange={(e) => setWeight(personId, Number(e.target.value))}
-        className="h-7 rounded-md border border-gray-200 bg-white px-1 text-xs text-gray-700"
-      >
-        {[1, 2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>{n === 1 ? '1 person' : `Counts as ${n}`}</option>)}
-      </select>
-    ) : weight > 1 ? <span className="text-xs text-gray-500">counts as {weight}</span> : null;
   async function setRole(userId: string, role: 'admin' | 'member') {
     const { error } = await createClient().rpc('set_member_role', { p_group_id: id, p_user_id: userId, p_role: role });
     if (error) toast(error.message, 'error');
@@ -404,6 +374,7 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
                   onUpdate={changed}
                   paidBack={paidBack.get(expense.id) ?? EMPTY}
                   copays={copays.get(expense.id)}
+                  names={names}
                 />
               ))}
               {features.export && <button onClick={exportCsv} className="w-full flex items-center justify-center gap-2 h-10 rounded-xl border border-gray-200 bg-white text-sm font-medium text-gray-700">
@@ -500,19 +471,29 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
             <Card padding="none">
               {(group.members || []).map((m: any, idx: number) => {
                 const p = m.profile as any;
-                const name = p?.full_name || p?.email || 'Unknown';
+                const name = memberName(m);
                 return (
                   <div key={m.user_id} className={`flex items-center gap-3 px-4 py-3 ${idx > 0 ? 'border-t border-gray-50' : ''}`}>
                     <Avatar src={p?.avatar_url} name={name} size="md" />
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-gray-900 truncate">{name}</p>
-                      <p className="text-xs text-gray-500 truncate">{p?.email}</p>
+                      <p className="text-xs text-gray-500 truncate">
+                        {m.nickname ? p?.full_name || p?.email : p?.email}
+                        {(m.weight ?? 1) > 1 && ` · pays for ${m.weight}`}
+                      </p>
                     </div>
                     <div className="flex flex-col items-end gap-1 shrink-0">
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${m.role === 'admin' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
                         {m.role}
                       </span>
-                      {weightControl(m.user_id, m.weight)}
+                      {isAdmin && (
+                        <button
+                          onClick={() => setEditing({ id: m.user_id, name: m.nickname ?? '', ownName: p?.full_name || p?.email, weight: m.weight ?? 1, joined: true })}
+                          className="text-xs font-medium text-blue-600"
+                        >
+                          Edit
+                        </button>
+                      )}
                       {isAdmin && m.user_id !== user.id && (m.role === 'member' || adminCount > 1) && (
                         <button
                           onClick={() => setRole(m.user_id, m.role === 'admin' ? 'member' : 'admin')}
@@ -528,10 +509,10 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
             </Card>
 
             {/* Pending members */}
-            {pendingMembers.length > 0 && (
+            {pendingCount > 0 && (
               <div>
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2 px-1">
-                  Pending ({pendingMembers.length})
+                  Pending ({pendingCount})
                 </p>
                 <Card padding="none">
                   {(group.pending_members || []).filter((pm: any) => !pm.claimed_by).map((pm: any, idx: number) => {
@@ -540,29 +521,22 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
                       <div key={pm.id} className={`px-4 py-3 ${idx > 0 ? 'border-t border-gray-50' : ''}`}>
                         <div className="flex items-center gap-3">
                           <Avatar name={pm.name} size="md" />
-                          {renaming?.id === pm.id ? (
-                            <form className="flex-1 min-w-0 flex gap-2" onSubmit={(e) => { e.preventDefault(); renamePending(pm.id, pm.name); }}>
-                              <input
-                                autoFocus
-                                value={renaming?.name ?? ""}
-                                maxLength={60}
-                                onChange={(e) => setRenaming({ id: pm.id, name: e.target.value })}
-                                className="flex-1 min-w-0 h-9 rounded-lg border border-gray-200 bg-white px-2 text-sm text-gray-900"
-                              />
-                              <button className="text-sm font-medium text-blue-600">Save</button>
-                            </form>
-                          ) : (
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-gray-900 truncate">{pm.name}</p>
-                              <p className="text-xs text-amber-600">
-                                Hasn&apos;t joined yet
-                                {isAdmin && <> · <button onClick={() => setRenaming({ id: pm.id, name: pm.name })} className="font-medium text-blue-600">Rename</button></>}
-                              </p>
-                            </div>
-                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-gray-900 truncate">{pm.name}</p>
+                            <p className="text-xs text-amber-600">
+                              Hasn&apos;t joined yet{(pm.weight ?? 1) > 1 && ` · pays for ${pm.weight}`}
+                            </p>
+                          </div>
                           <div className="flex flex-col items-end gap-1 shrink-0">
                             <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">pending</span>
-                            {weightControl(pm.id, pm.weight)}
+                            {isAdmin && (
+                              <button
+                                onClick={() => setEditing({ id: pm.id, name: pm.name, weight: pm.weight ?? 1, joined: false })}
+                                className="text-xs font-medium text-blue-600"
+                              >
+                                Edit
+                              </button>
+                            )}
                           </div>
                         </div>
                         <div className="mt-2 flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
@@ -578,6 +552,8 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
           </div>
         )}
       </motion.div>
+
+      {editing && <EditPersonSheet key={editing.id} groupId={id} person={editing} onClose={() => setEditing(null)} onSaved={() => { refetchGroup(); changed(); }} />}
 
       <PersonSheet
         open={!!personId}
