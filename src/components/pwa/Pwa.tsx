@@ -46,7 +46,8 @@ const remember = (k: string) => { try { localStorage.setItem(k, '1'); } catch {}
 const recalled = (k: string) => { try { return localStorage.getItem(k) === '1'; } catch { return false; } };
 
 /** "Add TripSplit to your home screen" card. One tap on Android; Share → Add to Home Screen hint on iPhone. */
-export function InstallPrompt() {
+/** `persistent` (Profile): ignores earlier dismissals so the option is always findable, and has no close button. */
+export function InstallPrompt({ persistent = false }: { persistent?: boolean }) {
   const [event, setEvent] = useState<BIPEvent | null>(null);
   const [ios, setIos] = useState(false);
   const [hidden, setHidden] = useState(true);
@@ -56,7 +57,7 @@ export function InstallPrompt() {
       window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone === true;
     // Opened from the home screen: remember it, so the browser stops offering the install
     if (standalone) { remember(INSTALLED_KEY); return; }
-    if (recalled(INSTALLED_KEY) || recalled(DISMISS_KEY)) return;
+    if (!persistent && (recalled(INSTALLED_KEY) || recalled(DISMISS_KEY))) return;
     let cancelled = false;
     // Chrome on Android can tell us directly whether this app is installed
     (navigator as any).getInstalledRelatedApps?.()
@@ -78,7 +79,7 @@ export function InstallPrompt() {
       window.removeEventListener('beforeinstallprompt', onPrompt);
       window.removeEventListener('appinstalled', onInstalled);
     };
-  }, []);
+  }, [persistent]);
 
   function dismiss() {
     setHidden(true);
@@ -96,7 +97,7 @@ export function InstallPrompt() {
   if (hidden || (!event && !ios)) return null;
 
   return (
-    <div className="mx-4 mt-4 flex items-start gap-3 rounded-2xl border border-blue-100 bg-blue-50 p-4">
+    <div className={`${persistent ? '' : 'mx-4 mt-4 '}flex items-start gap-3 rounded-2xl border border-blue-100 bg-blue-50 p-4`}>
       <img src="/icon-192.png" alt="" width={40} height={40} className="rounded-xl flex-shrink-0" />
       <div className="flex-1 min-w-0">
         <p className="font-semibold text-gray-900 text-sm">Add TripSplit to your home screen</p>
@@ -113,7 +114,7 @@ export function InstallPrompt() {
           </>
         )}
       </div>
-      <button onClick={dismiss} aria-label="Dismiss" className="p-1 text-gray-400"><X size={16} /></button>
+      {!persistent && <button onClick={dismiss} aria-label="Dismiss" className="p-1 text-gray-400"><X size={16} /></button>}
     </div>
   );
 }
