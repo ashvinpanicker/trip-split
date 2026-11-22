@@ -38,7 +38,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="h-full">
-      <body className="h-full antialiased bg-gray-50">
+      <body className="h-full antialiased bg-gray-50" suppressHydrationWarning>
+          {/* Apply the chosen theme (Settings) before first paint; see src/lib/theme.ts */}
+          <script dangerouslySetInnerHTML={{ __html: "try{var t=localStorage.getItem('tripsplit:theme');if(t==='light'||t==='dark')document.body.classList.add('theme-'+t)}catch(e){}" }} />
           <AuthListener />
           <Analytics />
           {children}

@@ -7,13 +7,18 @@
 export async function elementToPdf(el: HTMLElement, fileName: string, background: string) {
   const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import('html2canvas-pro'), import('jspdf')]);
 
-  // Lay it out at a page-like width (not phone width) while capturing, so the PDF reads like a document
+  // On a phone: narrow, phone-shaped pages with big text (readable without zooming).
+  // Elsewhere: A4 at a document width.
+  const phone = window.innerWidth < 640;
+  const layout = phone
+    ? { width: 440, format: [400, 760] as [number, number], margin: 14 }
+    : { width: 760, format: 'a4' as const, margin: 24 };
   const prevWidth = el.style.width, prevMax = el.style.maxWidth;
-  el.style.width = '760px';
+  el.style.width = `${layout.width}px`;
   el.style.maxWidth = 'none';
   await new Promise((r) => setTimeout(r, 350)); // let charts re-measure
   try {
-    return await render(el, fileName, background, html2canvas, jsPDF);
+    return await render(el, fileName, background, html2canvas, jsPDF, layout);
   } finally {
     el.style.width = prevWidth;
     el.style.maxWidth = prevMax;
@@ -23,6 +28,7 @@ export async function elementToPdf(el: HTMLElement, fileName: string, background
 async function render(
   el: HTMLElement, fileName: string, background: string,
   html2canvas: typeof import('html2canvas-pro').default, jsPDF: typeof import('jspdf').jsPDF,
+  layout: { format: 'a4' | [number, number]; margin: number },
 ) {
   const canvas = await html2canvas(el, {
     width: el.scrollWidth,
@@ -33,10 +39,10 @@ async function render(
     ignoreElements: (n) => n instanceof HTMLElement && n.classList.contains('no-print'),
   });
 
-  const pdf = new jsPDF({ unit: 'pt', format: 'a4', compress: true });
+  const pdf = new jsPDF({ unit: 'pt', format: layout.format, compress: true });
   const pageW = pdf.internal.pageSize.getWidth();
   const pageH = pdf.internal.pageSize.getHeight();
-  const margin = 24;
+  const margin = layout.margin;
   const contentW = pageW - margin * 2;
   const pxPerPt = canvas.width / contentW;              // canvas pixels per PDF point
   const sliceH = Math.floor((pageH - margin * 2) * pxPerPt); // canvas pixels per page

@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { createClient, getAuthUser } from '@/lib/supabase/client';
 import type { Group } from '@/types';
-import { useCachedState, hasCached } from './cache';
+import { useCachedState, hasCached, useRefreshOn } from './cache';
 
 export function useGroups() {
   const [groups, setGroups] = useCachedState<Group[]>('groups', []);
@@ -40,6 +40,7 @@ export function useGroups() {
     }
     setLoading(false);
   }, []);
+  useRefreshOn(load);
 
   useEffect(() => { load(); }, [load]);
 
@@ -76,6 +77,7 @@ export function useGroup(groupId: string) {
     setGroup(data ? { ...data, pending_members: pendingData ?? [] } as Group : null);
     setLoading(false);
   }, [groupId]);
+  useRefreshOn(load);
 
   useEffect(() => { load(); }, [load]);
 

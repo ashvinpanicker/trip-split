@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 /**
  * Stale-while-revalidate cache for the data hooks.
@@ -66,4 +66,13 @@ export function useCachedState<T>(key: string, initial: T) {
     persistSoon();
   }, [key]);
   return [value, set] as const;
+}
+
+/** Re-run `load` when the person pulls down to refresh (or anything fires 'tripsplit:refresh'). */
+export function useRefreshOn(load: () => unknown) {
+  useEffect(() => {
+    const f = () => { load(); };
+    window.addEventListener('tripsplit:refresh', f);
+    return () => window.removeEventListener('tripsplit:refresh', f);
+  }, [load]);
 }

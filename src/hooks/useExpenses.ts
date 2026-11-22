@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { createClient, getAuthUser } from '@/lib/supabase/client';
 import type { Expense, ExpenseParticipant, SettlementRecord } from '@/types';
-import { useCachedState, hasCached } from './cache';
+import { useCachedState, hasCached, useRefreshOn } from './cache';
 
 export function useExpenses(groupId: string) {
   const [expenses, setExpenses] = useCachedState<Expense[]>(`expenses:${groupId}`, []);
@@ -31,12 +31,14 @@ export function useExpenses(groupId: string) {
     setExpenses((data || []) as Expense[]);
     setLoading(false);
   }, [groupId]);
+  useRefreshOn(load);
 
   useEffect(() => {
     load();
     const onChange = () => load();
     window.addEventListener('tripsplit:expenses-changed', onChange);
-    return () => window.removeEventListener('tripsplit:expenses-changed', onChange);
+    window.addEventListener('tripsplit:refresh', onChange);
+    return () => { window.removeEventListener('tripsplit:expenses-changed', onChange); window.removeEventListener('tripsplit:refresh', onChange); };
   }, [load]);
 
   return { expenses, loading, refetch: load };
@@ -83,6 +85,10 @@ export function useAllExpenses() {
       setLoading(false);
     }
     load();
+    const onChange = () => load();
+    window.addEventListener('tripsplit:expenses-changed', onChange);
+    window.addEventListener('tripsplit:refresh', onChange);
+    return () => { window.removeEventListener('tripsplit:expenses-changed', onChange); window.removeEventListener('tripsplit:refresh', onChange); };
   }, []);
 
   return { expenses, loading };
@@ -102,6 +108,7 @@ export function useSettlements(groupId: string) {
     // Table missing (migration not run yet) → behave as "no payments recorded"
     setSettlements(error ? [] : ((data || []) as SettlementRecord[]));
   }, [groupId]);
+  useRefreshOn(load);
 
   useEffect(() => { load(); }, [load]);
 
@@ -130,7 +137,8 @@ export function useMyTotals() {
     load();
     const onChange = () => load();
     window.addEventListener('tripsplit:expenses-changed', onChange);
-    return () => window.removeEventListener('tripsplit:expenses-changed', onChange);
+    window.addEventListener('tripsplit:refresh', onChange);
+    return () => { window.removeEventListener('tripsplit:expenses-changed', onChange); window.removeEventListener('tripsplit:refresh', onChange); };
   }, []);
 
   return { ...data, loading };

@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react';
 import { Check, ChevronDown, Copy, FileText, Share2 } from 'lucide-react';
 import { format } from 'date-fns';
 import AddUpiInline from './AddUpiInline';
+import RecordPayment from './RecordPayment';
 import Card from '@/components/ui/Card';
 import BalanceList from './BalanceList';
 import SettlementList from './SettlementList';
@@ -59,6 +60,7 @@ export default function SettleUpPanel({
     });
     const when = format(new Date(), 'd MMM, h:mm a');
     return `💸 ${groupName}: settle up (${plan.length} payment${plan.length === 1 ? '' : 's'})\nUpdated ${when}\n\n${lines.join('\n')}\n\n` +
+      `Paid someone? Tap “Mark paid” in TripSplit so everyone’s balance updates.\n` +
       `Check the maths: ${window.location.origin}/groups/${groupId}/statement`;
   }
   const [copied, setCopied] = useState(false);
@@ -156,6 +158,12 @@ export default function SettleUpPanel({
             </button>
           </div>
         )}
+        <RecordPayment
+          persons={balances.map((b) => ({ id: b.person_id, name: b.user_name }))}
+          groupId={groupId}
+          currentUserId={currentUserId}
+          onRecorded={onRecorded}
+        />
         <a href={`/groups/${groupId}/statement`} className="flex items-center justify-center gap-1.5 text-sm font-medium text-blue-600">
           <FileText size={15} /> Check the maths (PDF)
         </a>

@@ -66,7 +66,7 @@ html:has(.mk) { background-color: #f7f9fc; }
 }
 
 /* Forced dark (the statement's theme switch), whatever the phone is set to */
-  html:has(.theme-dark) {
+  html:has(.theme-dark):not(:has(.mk)) {
     color-scheme: dark; /* native inputs, date pickers, scrollbars and Safari's top bar go dark too */
     --background: #0b111c;
     --foreground: #f2f4f7; /* default text, e.g. inputs without their own colour */
@@ -95,21 +95,21 @@ html:has(.mk) { background-color: #f7f9fc; }
     --chart-ink: #aab3c2;
   }
   /* Cards and inputs: a raised dark surface (white text on blue buttons is untouched) */
-  html:has(.theme-dark) .bg-white { background-color: #121a27; }
-  html:has(.theme-dark) .hover\:bg-white:hover { background-color: #1a2230; }
+  html:has(.theme-dark):not(:has(.mk)) .bg-white { background-color: #121a27; }
+  html:has(.theme-dark):not(:has(.mk)) .hover\:bg-white:hover { background-color: #1a2230; }
   /* Brighter accents so they stay readable on dark */
-  html:has(.theme-dark) :is(.text-blue-600, .text-blue-700) { color: #7fa9ff; }
-  html:has(.theme-dark) :is(.text-red-500, .text-red-600) { color: #ff8a8a; }
-  html:has(.theme-dark) :is(.text-green-600, .text-green-700) { color: #5ee0a0; }
-  html:has(.theme-dark) :is(.text-amber-600, .text-amber-700, .text-amber-800, .text-amber-900) { color: #f7c560; }
-  html:has(.theme-dark) :is(.border-gray-50, .border-gray-100) { border-color: #222b3a; }
-  html:has(.theme-dark) .bg-blue-100 { background-color: #1a2f55; }
-  html:has(.theme-dark) :is(.border-blue-100, .border-blue-200) { border-color: #27467a; }
-  html:has(.theme-dark) .border-amber-100 { border-color: #4a3812; }
+  html:has(.theme-dark):not(:has(.mk)) :is(.text-blue-600, .text-blue-700) { color: #7fa9ff; }
+  html:has(.theme-dark):not(:has(.mk)) :is(.text-red-500, .text-red-600) { color: #ff8a8a; }
+  html:has(.theme-dark):not(:has(.mk)) :is(.text-green-600, .text-green-700) { color: #5ee0a0; }
+  html:has(.theme-dark):not(:has(.mk)) :is(.text-amber-600, .text-amber-700, .text-amber-800, .text-amber-900) { color: #f7c560; }
+  html:has(.theme-dark):not(:has(.mk)) :is(.border-gray-50, .border-gray-100) { border-color: #222b3a; }
+  html:has(.theme-dark):not(:has(.mk)) .bg-blue-100 { background-color: #1a2f55; }
+  html:has(.theme-dark):not(:has(.mk)) :is(.border-blue-100, .border-blue-200) { border-color: #27467a; }
+  html:has(.theme-dark):not(:has(.mk)) .border-amber-100 { border-color: #4a3812; }
   /* Dark chips (toast, count badges) must stay dark: gray-900 itself flips to near-white */
-  html:has(.theme-dark) .bg-gray-900 { background-color: #33405a; }
+  html:has(.theme-dark):not(:has(.mk)) .bg-gray-900 { background-color: #33405a; }
   /* Toasts flip to light-on-dark's opposite, like the phone's own notifications */
-  html:has(.theme-dark) .toast-ok { background-color: #f2f4f7; color: #0b111c; }
+  html:has(.theme-dark):not(:has(.mk)) .toast-ok { background-color: #f2f4f7; color: #0b111c; }
 
 
 /* No sideways scrolling on phones */

@@ -1,7 +1,8 @@
 'use client';
 
 import { format } from 'date-fns';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
+import { useTheme } from '@/lib/theme';
 import { Download, Loader2, Moon, Sun } from 'lucide-react';
 import { elementToPdf } from '@/lib/utils/pdf';
 import { formatCurrency } from '@/lib/utils/balance';
@@ -37,17 +38,10 @@ export default function Statement({ tripName, currency, persons, expenses, payme
   const money = (n: number) => formatCurrency(n, currency).replace(/[.,]00(?!\d)/, '');
   const ref = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
-  // Light or dark, for the page and the PDF. Starts from the phone's setting.
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
-  useEffect(() => {
-    let saved: string | null = null;
-    try { saved = localStorage.getItem('tripsplit:statement-theme'); } catch {}
-    setTheme(saved === 'dark' || saved === 'light' ? saved : matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-  }, []);
-  function pickTheme(t: 'light' | 'dark') {
-    setTheme(t);
-    try { localStorage.setItem('tripsplit:statement-theme', t); } catch {}
-  }
+  // Light or dark for the page and the PDF: the same setting as Settings → Theme
+  const { dark, setTheme } = useTheme();
+  const theme = dark ? 'dark' : 'light';
+  const pickTheme = (t: 'light' | 'dark') => setTheme(t);
   async function savePdf() {
     if (!ref.current || busy) return;
     setBusy(true);
@@ -68,7 +62,7 @@ export default function Statement({ tripName, currency, persons, expenses, payme
   const num = 'text-right tabular-nums whitespace-nowrap';
 
   return (
-    <div ref={ref} className={`statement theme-${theme} max-w-3xl mx-auto px-4 py-6 text-sm text-gray-900 bg-white min-h-screen`}>
+    <div ref={ref} className={`statement max-w-3xl mx-auto px-4 py-6 text-sm text-gray-900 bg-white min-h-screen`}>
       <style>{`@media print {
         @page { margin: 12mm; }
         nav, .no-print { display: none !important; }

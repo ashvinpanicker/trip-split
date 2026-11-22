@@ -63,7 +63,7 @@ export default function SettingsPage() {
           <LogOut size={16} className="mr-2" /> {t('settings.signOut')}
         </Button>
 
-        <div className="text-center text-xs text-gray-500 pt-2 pb-6">
+        <div className="text-center text-xs text-gray-500 pt-2 pb-10 space-y-2">
           <p>TripSplit is free and open source. <a href="https://github.com/ashvinpanicker/trip-split" className="underline">Source code</a></p>
           <SupportLinks className="mt-1 [&_div]:justify-center" />
         </div>

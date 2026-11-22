@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { hydrateCache } from '@/hooks/cache';
 import PageSkeleton from '@/components/ui/PageSkeleton';
+import PullToRefresh from '@/components/layout/PullToRefresh';
 import { usePathname } from 'next/navigation';
 import { setActiveCurrency } from '@/lib/utils/balance';
 import BottomNav from '@/components/layout/BottomNav';
@@ -28,6 +29,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <div className="flex flex-col min-h-screen bg-gray-50">
         <OfflineBanner />
         <main className="flex-1 pb-[calc(7rem+env(safe-area-inset-bottom))]">
+          <PullToRefresh />
           {ready ? children : <PageSkeleton />}
         </main>
         <BottomNav onAddExpense={() => setShowAddExpense(true)} />

@@ -33,6 +33,21 @@ export default function SettlementList({
   const t = useT();
   const [savingIdx, setSavingIdx] = useState<number | null>(null);
   const [qrIdx, setQrIdx] = useState<number | null>(null);
+  // Tapped "Pay via UPI" and came back to the app? Ask whether it went through, so it gets marked here
+  const [askIdx, setAskIdx] = useState<number | null>(null);
+  const tappedPay = (idx: number) => { try { sessionStorage.setItem('tripsplit:paying', JSON.stringify({ idx, at: Date.now() })); } catch {} };
+  useEffect(() => {
+    const check = () => {
+      if (document.visibilityState !== 'visible') return;
+      try {
+        const p = JSON.parse(sessionStorage.getItem('tripsplit:paying') || 'null');
+        if (p && Date.now() - p.at < 30 * 60_000 && Date.now() - p.at > 2_000) setAskIdx(p.idx);
+      } catch {}
+    };
+    document.addEventListener('visibilitychange', check);
+    return () => document.removeEventListener('visibilitychange', check);
+  }, []);
+  const doneAsking = () => { setAskIdx(null); try { sessionStorage.removeItem('tripsplit:paying'); } catch {} };
   // Personal "your balance" links (no sign-in) for people who owe you; falls back to the trip page
   const [links, setLinks] = useState<Record<string, string>>({});
   const debtorKey = settlements.filter((x) => x.to_id === currentUserId).map((x) => x.from_id).sort().join(',');
@@ -69,10 +84,10 @@ export default function SettlementList({
     );
   }
 
-  async function markPaid(s: Settlement, idx: number) {
+  async function markPaid(s: Settlement, idx: number, confirmed = false) {
     if (!groupId) return;
     const who = s.from_id === currentUserId ? t('you') : s.from_name;
-    if (!confirm(t('settle.confirm', { who, to: s.to_id === currentUserId ? t('you') : s.to_name, amount: formatCurrency(s.amount) }))) return;
+    if (!confirmed && !confirm(t('settle.confirm', { who, to: s.to_id === currentUserId ? t('you') : s.to_name, amount: formatCurrency(s.amount) }))) return;
     setSavingIdx(idx);
     const supabase = createClient();
     const { error } = await supabase.from('settlements').insert({
@@ -165,6 +180,7 @@ export default function SettlementList({
                         <a
                           key={`${a.type}-${a.value}`}
                           href={a.href}
+                          onClick={() => tappedPay(i)}
                           target={a.href.startsWith('https:') ? '_blank' : undefined}
                           rel="noopener noreferrer"
                           className={`flex-1 min-w-[7.5rem] flex items-center justify-center gap-1.5 h-9 rounded-lg text-sm font-medium ${
@@ -183,6 +199,15 @@ export default function SettlementList({
                         </button>
                       ),
                     )}
+                  </div>
+                )}
+                {askIdx === i && isYouPaying && (
+                  <div role="alert" className="rounded-xl bg-green-50 border border-green-200 p-3 space-y-2">
+                    <p className="text-sm font-medium text-gray-900">{t('settle.didYouPay', { name: s.to_name.split(' ')[0], amount: formatCurrency(s.amount) })}</p>
+                    <div className="flex gap-2">
+                      <button onClick={() => { doneAsking(); markPaid(s, i, true); }} className="flex-1 h-9 rounded-lg bg-green-600 text-white text-sm font-semibold">{t('settle.yesPaid')}</button>
+                      <button onClick={doneAsking} className="flex-1 h-9 rounded-lg border border-gray-200 bg-white text-sm text-gray-700">{t('settle.notYet')}</button>
+                    </div>
                   </div>
                 )}
                 {payeeUpi && (
