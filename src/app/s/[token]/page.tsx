@@ -3,6 +3,7 @@
 import { use, useEffect, useState } from 'react';
 import { Copy, ExternalLink } from 'lucide-react';
 import { LogoMark } from '@/components/Logo';
+import { useT, setLang } from '@/lib/i18n';
 import { createClient } from '@/lib/supabase/client';
 import { calculateGroupBalances, directDebts, smartSettle, formatCurrency, setActiveCurrency, type BalancePerson } from '@/lib/utils/balance';
 import { payActions, readPayMethods } from '@/lib/utils/payMethods';
@@ -23,6 +24,7 @@ export default function BalanceLinkPage({ params }: { params: Promise<{ token: s
   const [data, setData] = useState<LinkData | null>(null);
   const [state, setState] = useState<'loading' | 'ok' | 'missing'>('loading');
   const [copied, setCopied] = useState<string | null>(null);
+  const t = useT();
 
   useEffect(() => {
     if (!/^[0-9a-f-]{36}$/i.test(token)) { setState('missing'); return; }
@@ -39,8 +41,8 @@ export default function BalanceLinkPage({ params }: { params: Promise<{ token: s
     return (
       <div className="max-w-md mx-auto p-6 text-center">
         <LogoMark className="mx-auto h-10 w-10" />
-        <p className="mt-4 font-semibold text-gray-900">This link doesn't work any more</p>
-        <p className="mt-1 text-sm text-gray-500">Ask whoever sent it for a fresh one.</p>
+        <p className="mt-4 font-semibold text-gray-900">{t('link.broken')}</p>
+        <p className="mt-1 text-sm text-gray-500">{t('link.brokenHint')}</p>
       </div>
     );
   }
@@ -78,15 +80,15 @@ export default function BalanceLinkPage({ params }: { params: Promise<{ token: s
       </header>
 
       <section className="rounded-2xl bg-white border border-gray-100 p-5">
-        <p className="text-sm text-gray-500">Hi {me ? first(me.name) : 'there'}</p>
+        <p className="text-sm text-gray-500">{t('link.hi', { name: me ? first(me.name) : '' })}</p>
         {Math.abs(net) < 0.01 ? (
-          <p className="mt-1 text-2xl font-bold text-gray-900">You're all settled up 🎉</p>
+          <p className="mt-1 text-2xl font-bold text-gray-900">{t('link.settled')}</p>
         ) : net < 0 ? (
-          <p className="mt-1 text-2xl font-bold text-red-600">You owe {formatCurrency(-net)}</p>
+          <p className="mt-1 text-2xl font-bold text-red-600">{t('link.owe', { amount: formatCurrency(-net) })}</p>
         ) : (
-          <p className="mt-1 text-2xl font-bold text-green-600">You get back {formatCurrency(net)}</p>
+          <p className="mt-1 text-2xl font-bold text-green-600">{t('link.get', { amount: formatCurrency(net) })}</p>
         )}
-        <p className="mt-1 text-xs text-gray-500">Your share of {expenses.length} expenses: {formatCurrency(myShare)}</p>
+        <p className="mt-1 text-xs text-gray-500">{t('link.share', { n: expenses.length, amount: formatCurrency(myShare) })}</p>
       </section>
 
       {mine.map((s, i) => {
@@ -97,37 +99,41 @@ export default function BalanceLinkPage({ params }: { params: Promise<{ token: s
         return (
           <section key={i} className="rounded-2xl bg-white border border-gray-100 p-4">
             <p className="text-gray-900">
-              {paying ? <>Pay <strong>{first(other)}</strong></> : <><strong>{first(other)}</strong> pays you</>}{' '}
-              <strong className="tabular-nums">{formatCurrency(s.amount)}</strong>
+              {paying ? t('link.pay', { name: first(other), amount: formatCurrency(s.amount) }) : t('link.paysYou', { name: first(other), amount: formatCurrency(s.amount) })}
             </p>
             {paying && actions.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-2">
                 {actions.map((a, k) => a.href ? (
                   <a key={a.type + a.value} href={a.href} target={a.href.startsWith('https:') ? '_blank' : undefined} rel="noopener noreferrer"
                     className={`flex-1 min-w-[7.5rem] flex items-center justify-center gap-1.5 h-11 rounded-xl text-sm font-semibold ${k === 0 ? 'bg-blue-600 text-white' : 'bg-white border border-blue-200 text-blue-700'}`}>
-                    Pay via {a.label} {a.href.startsWith('https:') && <ExternalLink size={12} />}
+                    {t('settle.payVia', { method: a.label })} {a.href.startsWith('https:') && <ExternalLink size={12} />}
                   </a>
                 ) : (
                   <button key={a.type + a.value} onClick={() => copy(a.value)}
                     className="flex-1 min-w-[7.5rem] flex items-center justify-center gap-1.5 h-11 rounded-xl bg-white border border-gray-200 text-gray-700 text-sm font-medium">
-                    <Copy size={13} /> {copied === a.value ? 'Copied' : `${a.label} address`}
+                    <Copy size={13} /> {copied === a.value ? '✓' : t('settle.address', { method: a.label })}
                   </button>
                 ))}
               </div>
             )}
             {paying && actions.length === 0 && (
-              <p className="mt-2 text-xs text-gray-500">{first(other)} hasn't added a payment method yet. Pay them however you usually do.</p>
+              <p className="mt-2 text-xs text-gray-500">{t('link.noMethod', { name: first(other) })}</p>
             )}
           </section>
         );
       })}
 
       {mine.some((s) => s.from_id === data.person_id) && (
-        <p className="text-xs text-gray-500 text-center">After you pay, tell the trip admin so they can mark it paid.</p>
+        <p className="text-xs text-gray-500 text-center">{t('link.after')}</p>
       )}
 
+      <p className="text-center text-xs pt-2">
+        <button onClick={() => setLang(t.lang === 'hi' ? 'en' : 'hi')} className="text-blue-600 underline">
+          {t.lang === 'hi' ? 'English' : 'हिन्दी में देखें'}
+        </button>
+      </p>
       <p className="text-center text-xs text-gray-400 pt-4">
-        Want to add expenses yourself? <a href="/register" className="underline">Make a free account</a>.
+        {t('link.join')} <a href="/register" className="underline">{t('link.signup')}</a>
       </p>
     </main>
   );

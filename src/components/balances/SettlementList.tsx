@@ -1,5 +1,6 @@
 'use client';
 
+import { useT } from '@/lib/i18n';
 import { useEffect, useState } from 'react';
 import { ArrowRight, Check, Copy, ExternalLink, MessageCircle } from 'lucide-react';
 import Avatar from '@/components/ui/Avatar';
@@ -28,6 +29,7 @@ export default function SettlementList({
   settlements, currentUserId, groupId, groupName, payMethods = {}, onRecorded, onOpenPerson, isRerouted,
 }: SettlementListProps) {
   const { toast } = useToast();
+  const t = useT();
   const [savingIdx, setSavingIdx] = useState<number | null>(null);
   // Personal "your balance" links (no sign-in) for people who owe you; falls back to the trip page
   const [links, setLinks] = useState<Record<string, string>>({});
@@ -41,8 +43,10 @@ export default function SettlementList({
     })).then((rows) => setLinks(Object.fromEntries(rows.filter(([, u]) => u) as [string, string][])));
   }, [groupId, debtorKey]);
   const remindText = (s: Settlement) =>
-    `Hey ${s.from_name.split(' ')[0]}, quick nudge from ${groupName ?? 'our trip'}: you owe me ${formatCurrency(s.amount)}. ` +
-    `See it and pay in one tap here: ${links[s.from_id] ?? `${typeof location !== 'undefined' ? location.origin : 'https://gotripsplit.app'}/groups/${groupId}`}`;
+    t('settle.remindText', {
+      name: s.from_name.split(' ')[0], trip: groupName ?? 'TripSplit', amount: formatCurrency(s.amount),
+      link: links[s.from_id] ?? `${typeof location !== 'undefined' ? location.origin : 'https://gotripsplit.app'}/groups/${groupId}`,
+    });
 
   async function copyAddress(label: string, value: string) {
     try {
@@ -57,16 +61,16 @@ export default function SettlementList({
     return (
       <div className="text-center py-6">
         <p className="text-2xl mb-2">🎉</p>
-        <p className="text-gray-600 font-medium">All settled up!</p>
-        <p className="text-gray-400 text-sm">No payments needed</p>
+        <p className="text-gray-600 font-medium">{t('settle.done')}</p>
+        <p className="text-gray-400 text-sm">{t('settle.none')}</p>
       </div>
     );
   }
 
   async function markPaid(s: Settlement, idx: number) {
     if (!groupId) return;
-    const who = s.from_id === currentUserId ? 'you' : s.from_name;
-    if (!confirm(`Record that ${who} paid ${s.to_id === currentUserId ? 'you' : s.to_name} ${formatCurrency(s.amount)}?`)) return;
+    const who = s.from_id === currentUserId ? t('you') : s.from_name;
+    if (!confirm(t('settle.confirm', { who, to: s.to_id === currentUserId ? t('you') : s.to_name, amount: formatCurrency(s.amount) }))) return;
     setSavingIdx(idx);
     const supabase = createClient();
     const { error } = await supabase.from('settlements').insert({
@@ -81,7 +85,7 @@ export default function SettlementList({
       toast(error.message.includes('settlements') ? 'Run supabase/goa_upgrade.sql first' : error.message, 'error');
       return;
     }
-    toast('Payment recorded');
+    toast(t('settle.recorded'));
     onRecorded?.();
   }
 
@@ -103,8 +107,8 @@ export default function SettlementList({
           >
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2 flex-1 min-w-0">
-                <Avatar name={isYouPaying ? 'You' : s.from_name} size="sm" />
-                <p className="text-sm font-medium text-gray-900 truncate">{isYouPaying ? 'You' : s.from_name}</p>
+                <Avatar name={isYouPaying ? t('you') : s.from_name} size="sm" />
+                <p className="text-sm font-medium text-gray-900 truncate">{isYouPaying ? t('you') : s.from_name}</p>
               </div>
               <div className="flex flex-col items-center">
                 <span className={`text-sm font-bold ${isYouPaying ? 'text-red-600' : isYouReceiving ? 'text-green-600' : 'text-gray-900'}`}>
@@ -113,8 +117,8 @@ export default function SettlementList({
                 <ArrowRight size={14} className="text-gray-400" />
               </div>
               <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
-                <p className="text-sm font-medium text-gray-900 truncate text-right">{isYouReceiving ? 'You' : s.to_name}</p>
-                <Avatar name={isYouReceiving ? 'You' : s.to_name} size="sm" />
+                <p className="text-sm font-medium text-gray-900 truncate text-right">{isYouReceiving ? t('you') : s.to_name}</p>
+                <Avatar name={isYouReceiving ? t('you') : s.to_name} size="sm" />
               </div>
             </div>
 
@@ -126,7 +130,7 @@ export default function SettlementList({
                     onClick={() => onOpenPerson(isYouPaying ? s.to_id : s.from_id)}
                     className="font-medium text-blue-600 shrink-0"
                   >
-                    See breakdown
+                    {t('settle.breakdown')}
                   </button>
                 )}
               </div>
@@ -139,7 +143,7 @@ export default function SettlementList({
                   disabled={savingIdx !== null}
                   className="text-xs font-medium text-gray-500 hover:text-blue-600 disabled:opacity-50"
                 >
-                  {savingIdx === i ? 'Saving…' : 'Mark paid'}
+                  {savingIdx === i ? t('settle.saving') : t('settle.markPaid')}
                 </button>
               </div>
             )}
@@ -159,7 +163,7 @@ export default function SettlementList({
                             k === 0 ? 'bg-blue-600 text-white active:bg-blue-700' : 'bg-white border border-blue-200 text-blue-700'
                           }`}
                         >
-                          Pay via {a.label} {a.href.startsWith('https:') && <ExternalLink size={12} />}
+                          {t('settle.payVia', { method: a.label })} {a.href.startsWith('https:') && <ExternalLink size={12} />}
                         </a>
                       ) : (
                         <button
@@ -167,7 +171,7 @@ export default function SettlementList({
                           onClick={() => copyAddress(a.label, a.value)}
                           className="flex-1 min-w-[7.5rem] flex items-center justify-center gap-1.5 h-9 rounded-lg bg-white border border-gray-200 text-gray-700 text-sm font-medium"
                         >
-                          <Copy size={13} /> {a.label} address
+                          <Copy size={13} /> {t('settle.address', { method: a.label })}
                         </button>
                       ),
                     )}
@@ -181,7 +185,7 @@ export default function SettlementList({
                     rel="noopener noreferrer"
                     className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-lg bg-white border border-green-200 text-green-700 text-sm font-medium"
                   >
-                    <MessageCircle size={14} /> Remind
+                    <MessageCircle size={14} /> {t('settle.remind')}
                   </a>
                 )}
                 <button
@@ -189,7 +193,7 @@ export default function SettlementList({
                   disabled={savingIdx !== null}
                   className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-lg bg-white border border-gray-200 text-gray-700 text-sm font-medium active:bg-gray-50 disabled:opacity-50"
                 >
-                  <Check size={14} /> {savingIdx === i ? 'Saving…' : isYouReceiving ? 'Got it' : 'Mark paid'}
+                  <Check size={14} /> {savingIdx === i ? t('settle.saving') : isYouReceiving ? t('settle.gotIt') : t('settle.markPaid')}
                 </button>
               </div>
               </div>
@@ -199,7 +203,7 @@ export default function SettlementList({
       })}
       {groupId && (
         <p className="text-xs text-gray-400 text-center">
-          Add UPI, PayPal, Revolut, crypto and more in <a href="/profile" className="underline">Profile</a> so friends can pay you in one tap.
+          <a href="/profile" className="underline">{t('settle.addMethods')}</a>
         </p>
       )}
     </div>

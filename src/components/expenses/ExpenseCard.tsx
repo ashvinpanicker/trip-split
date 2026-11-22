@@ -1,5 +1,6 @@
 'use client';
 
+import { useT } from '@/lib/i18n';
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { MoreVertical, Edit2, Trash2, ChevronDown, ChevronUp, Paperclip } from 'lucide-react';
@@ -31,10 +32,11 @@ export default function ExpenseCard({ expense, currentUserId, onDelete, onUpdate
   const [showMenu, setShowMenu] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const t = useT();
 
   const payer = expense.payer as any;
   const payerName = payer?.id === currentUserId
-    ? 'You'
+    ? t('you')
     : payer?.full_name || payer?.email || expense.payer_pending?.name || 'Unknown';
   const payerId = payerIdOf(expense);
   const isMyExpense = expense.paid_by === currentUserId;
@@ -44,14 +46,14 @@ export default function ExpenseCard({ expense, currentUserId, onDelete, onUpdate
   const myShare = myParticipation?.share_amount ?? 0;
 
   async function handleDelete() {
-    if (!confirm('Delete this expense?')) return;
+    if (!confirm(t('exp.confirmDelete'))) return;
     setDeleting(true);
     if (expense.receipt_path) await supabase.storage.from('receipts').remove([expense.receipt_path]);
     const { error } = await supabase.from('expenses').delete().eq('id', expense.id);
     if (error) {
       toast('Failed to delete expense', 'error');
     } else {
-      toast('Expense deleted');
+      toast(t('exp.deleted'));
       onDelete?.();
     }
     setDeleting(false);
@@ -99,7 +101,7 @@ export default function ExpenseCard({ expense, currentUserId, onDelete, onUpdate
                 )}
                 <p className="font-semibold text-gray-900 truncate">{expense.title}</p>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  {format(new Date(expense.date), 'MMM d')} · {payerName} paid
+                  {t('exp.paid', { date: format(new Date(expense.date), 'MMM d'), name: payerName })}
                 </p>
               </div>
               <div className="flex items-center gap-1 flex-shrink-0">
@@ -107,9 +109,9 @@ export default function ExpenseCard({ expense, currentUserId, onDelete, onUpdate
                   <p className="font-bold text-gray-900">{formatCurrency(expense.amount, currency)}</p>
                   {expense.fx && <p className="text-xs text-gray-500">{formatCurrency(expense.fx.amount, expense.fx.currency)}</p>}
                   {isMyExpense ? (
-                    <p className="text-xs text-green-600 font-medium">you paid</p>
+                    <p className="text-xs text-green-600 font-medium">{t('exp.youPaid')}</p>
                   ) : myShare > 0 ? (
-                    <p className="text-xs text-red-500 font-medium">you owe {formatCurrency(myShare, currency)}</p>
+                    <p className="text-xs text-red-500 font-medium">{t('exp.youOwe', { amount: formatCurrency(myShare, currency) })}</p>
                   ) : null}
                 </div>
                 <div className="relative">
@@ -127,14 +129,14 @@ export default function ExpenseCard({ expense, currentUserId, onDelete, onUpdate
                           onClick={() => { setShowEdit(true); setShowMenu(false); }}
                           className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
                         >
-                          <Edit2 size={14} /> Edit
+                          <Edit2 size={14} /> {t('exp.edit')}
                         </button>
                         <button
                           onClick={handleDelete}
                           disabled={deleting}
                           className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
                         >
-                          <Trash2 size={14} /> Delete
+                          <Trash2 size={14} /> {t('exp.delete')}
                         </button>
                       </div>
                     </>

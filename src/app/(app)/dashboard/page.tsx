@@ -1,5 +1,6 @@
 'use client';
 
+import { useT } from '@/lib/i18n';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Bell, TrendingUp, TrendingDown, Users } from 'lucide-react';
@@ -17,6 +18,7 @@ import { groupColors } from '@/lib/utils/groupColor';
 
 export default function DashboardPage() {
   const router = useRouter();
+  const t = useT();
   const { user } = useUser();
   const { groups } = useGroups();
   const { expenses, loading: expLoading } = useAllExpenses();
@@ -42,8 +44,8 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-col">
       <AppHeader
-        title={`Hi, ${user.full_name?.split(' ')[0] || 'there'} 👋`}
-        subtitle="Here's your summary"
+        title={t('dash.hi', { name: user.full_name?.split(' ')[0] || '' }).replace(', 👋', ' 👋')}
+        subtitle={t('dash.summary')}
         right={<Avatar src={user.avatar_url} name={user.full_name || user.email} size="sm" />}
       />
       <InstallPrompt />
@@ -51,21 +53,21 @@ export default function DashboardPage() {
       <div className="p-4 space-y-4">
         {/* Balance summary */}
         <Card className="bg-gradient-to-br from-blue-600 to-blue-700 border-0 text-white">
-          <p className="text-blue-100 text-sm mb-1">Net Balance</p>
+          <p className="text-blue-100 text-sm mb-1">{t('dash.net')}</p>
           <p className={`text-3xl font-bold mb-3 ${net >= 0 ? 'text-white' : 'text-red-200'}`}>
             {net >= 0 ? '+' : ''}{formatCurrency(net, mainCode)}
           </p>
           <div className="flex gap-4">
             <div>
               <div className="flex items-center gap-1 text-blue-200 text-xs mb-0.5">
-                <TrendingUp size={12} /> You are owed
+                <TrendingUp size={12} /> {t('dash.owed')}
               </div>
               <p className="text-white font-semibold">{formatCurrency(totalOwed, mainCode)}</p>
             </div>
             <div className="w-px bg-blue-500" />
             <div>
               <div className="flex items-center gap-1 text-blue-200 text-xs mb-0.5">
-                <TrendingDown size={12} /> You owe
+                <TrendingDown size={12} /> {t('dash.owe')}
               </div>
               <p className="text-white font-semibold">{formatCurrency(totalOwe, mainCode)}</p>
             </div>
@@ -81,9 +83,9 @@ export default function DashboardPage() {
         {active.length > 0 && (
           <div>
             <div className="flex items-center justify-between mb-3">
-              <h2 className="font-semibold text-gray-900">Your Groups</h2>
+              <h2 className="font-semibold text-gray-900">{t('dash.groups')}</h2>
               <button onClick={() => router.push('/groups')} className="text-blue-600 text-sm">
-                See all
+                {t('dash.seeAll')}
               </button>
             </div>
             <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1">
@@ -108,7 +110,7 @@ export default function DashboardPage() {
 
         {/* Recent expenses */}
         <div>
-          <h2 className="font-semibold text-gray-900 mb-3">Recent Activity</h2>
+          <h2 className="font-semibold text-gray-900 mb-3">{t('dash.recent')}</h2>
           {expLoading ? (
             <div className="space-y-3">
               {[1, 2, 3].map((i) => (
@@ -118,8 +120,8 @@ export default function DashboardPage() {
           ) : recent.length === 0 ? (
             <EmptyState
               icon={Users}
-              title="No expenses yet"
-              description="Create a group and add your first expense"
+              title={t('dash.empty')}
+              description={t('dash.emptyHint')}
             />
           ) : (
             <div className="space-y-3">

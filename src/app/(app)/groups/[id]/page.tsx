@@ -1,5 +1,6 @@
 'use client';
 
+import { useT } from '@/lib/i18n';
 import { useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Plus, Users, Receipt, Copy, Check, Trash2, History, Search, Download } from 'lucide-react';
@@ -66,6 +67,7 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
   const changed = () => window.dispatchEvent(new Event('tripsplit:expenses-changed'));
   // null = no saved choice yet (admins then see advanced features)
   const advancedPref = useAdvancedPref();
+  const t = useT();
 
   if (groupLoading) {
     return (
@@ -91,7 +93,7 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
 
   const allPersons = [...realMembers, ...pendingMembers];
   const nameOf = (pid: string) =>
-    pid === user.id ? 'You' : allPersons.find((p) => p.id === pid)?.name ?? 'Someone';
+    pid === user.id ? t('you') : allPersons.find((p) => p.id === pid)?.name ?? t('someone');
 
   const payMethods: Record<string, PayMethod[]> = {};
   for (const m of group.members || []) payMethods[m.user_id] = readPayMethods((m.profile as any)?.pay_methods, (m.profile as any)?.upi_id);
@@ -110,9 +112,9 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
   // "Just track spending": no balances or settle-up (who paid is still saved)
   const trackOnly = !!group.track_only;
   const views: { key: Tab; label: string }[] = [
-    { key: 'expenses', label: 'Expenses' },
-    ...(trackOnly ? [] : [{ key: 'balances' as Tab, label: 'Balances' }]),
-    ...(advanced ? [{ key: 'stats' as Tab, label: 'Stats' }] : []),
+    { key: 'expenses', label: t('trip.tab.expenses') },
+    ...(trackOnly ? [] : [{ key: 'balances' as Tab, label: t('trip.tab.balances') }]),
+    ...(advanced ? [{ key: 'stats' as Tab, label: t('trip.tab.stats') }] : []),
   ];
   const view = (trackOnly && tab === 'balances') || (!advanced && (tab === 'stats' || tab === 'activity')) ? 'expenses' : tab;
   const myPaid = stats.paidUpfront.find((p) => p.id === user.id)?.total ?? 0;
@@ -193,8 +195,8 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
           // Less-used views live here; the bottom bar's + already adds expenses to this trip
           <div className="flex items-center gap-1">
             {([
-              { key: 'members', label: `People (${allPersons.length})`, icon: Users, badge: allPersons.length },
-              { key: 'activity', label: 'Activity', icon: History, badge: 0 },
+              { key: 'members', label: `${t('trip.people')} (${allPersons.length})`, icon: Users, badge: allPersons.length },
+              { key: 'activity', label: t('trip.activity'), icon: History, badge: 0 },
             ] as const).filter((b) => advanced || b.key !== 'activity').map(({ key, label, icon: Icon, badge }) => (
               <button
                 key={key}
@@ -218,8 +220,8 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
       />
       {group.archived_at && (
         <div className="mx-4 mt-3 flex items-center justify-between gap-3 rounded-xl bg-gray-100 px-3 py-2 text-sm text-gray-600">
-          <span>This trip is archived.</span>
-          {isAdmin && <button onClick={() => setArchived(false)} className="font-medium text-blue-600">Restore</button>}
+          <span>{t('trip.archived')}</span>
+          {isAdmin && <button onClick={() => setArchived(false)} className="font-medium text-blue-600">{t('trip.restore')}</button>}
         </div>
       )}
 
@@ -227,30 +229,30 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
       <div className="bg-white border-b border-gray-100 px-4 py-3">
         <div className="flex gap-3">
           <div className="flex-1 min-w-0">
-            <p className="text-xs text-gray-500">Total Spent</p>
+            <p className="text-xs text-gray-500">{t('trip.total')}</p>
             <p className="font-bold text-gray-900 truncate">{formatCurrency(totalExpenses)}</p>
           </div>
           {trackOnly ? (
             <>
               <div className="flex-1 min-w-0">
-                <p className="text-xs text-gray-500">{stats.days > 1 ? 'Per day' : 'Expenses'}</p>
+                <p className="text-xs text-gray-500">{stats.days > 1 ? t('trip.perDay') : t('trip.expenses')}</p>
                 <p className="font-bold text-gray-900 truncate">{stats.days > 1 ? formatCurrency(stats.perDay) : stats.count}</p>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs text-gray-500">You paid</p>
+                <p className="text-xs text-gray-500">{t('trip.youPaid')}</p>
                 <p className="font-bold text-gray-900 truncate">{formatCurrency(myPaid)}</p>
               </div>
             </>
           ) : (
             <>
               <div className="flex-1 min-w-0">
-                <p className="text-xs text-gray-500">My Balance</p>
+                <p className="text-xs text-gray-500">{t('trip.myBalance')}</p>
                 <p className={`font-bold truncate ${myBalance && myBalance.net_balance >= 0 ? 'text-green-600' : 'text-red-500'}`}>
                   {myBalance ? (myBalance.net_balance >= 0 ? '+' : '') + formatCurrency(myBalance.net_balance) : '—'}
                 </p>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs text-gray-500">My Share</p>
+                <p className="text-xs text-gray-500">{t('trip.myShare')}</p>
                 <p className="font-bold text-gray-900 truncate">{formatCurrency(myTotalShare)}</p>
               </div>
             </>
@@ -281,8 +283,8 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
 
       {(tab === 'members' || tab === 'activity') && (
         <div className="px-4 pt-3 -mb-1 flex items-center justify-between">
-          <h2 className="font-semibold text-gray-900">{tab === 'members' ? 'People' : 'Activity'}</h2>
-          <button onClick={() => setTab('expenses')} className="text-sm text-blue-600 font-medium">Done</button>
+          <h2 className="font-semibold text-gray-900">{tab === 'members' ? t('trip.people') : t('trip.activity')}</h2>
+          <button onClick={() => setTab('expenses')} className="text-sm text-blue-600 font-medium">{t('trip.done')}</button>
         </div>
       )}
 
@@ -294,9 +296,9 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
           ) : expenses.length === 0 ? (
             <EmptyState
               icon={Receipt}
-              title="No expenses yet"
-              description="Add your first expense"
-              action={<Button onClick={() => setShowAddExpense(true)}><Plus size={16} className="mr-1" /> Add expense</Button>}
+              title={t('trip.noExpenses')}
+              description={t('trip.addFirst')}
+              action={<Button onClick={() => setShowAddExpense(true)}><Plus size={16} className="mr-1" /> {t('trip.addExpense')}</Button>}
             />
           ) : (
             <>
@@ -307,8 +309,8 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
                     type="search"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Search expenses"
-                    aria-label="Search expenses"
+                    placeholder={t('trip.search')}
+                    aria-label={t('trip.search')}
                     className="block w-full min-w-0 h-11 pl-9 pr-3 rounded-xl border border-gray-200 bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -343,7 +345,7 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
                 )}
               </div>
               {shown.length === 0 ? (
-                <p className="text-sm text-gray-500 text-center py-8">No expenses match.</p>
+                <p className="text-sm text-gray-500 text-center py-8">{t('trip.noMatch')}</p>
               ) : shown.map((expense) => (
                 <ExpenseCard
                   key={expense.id}

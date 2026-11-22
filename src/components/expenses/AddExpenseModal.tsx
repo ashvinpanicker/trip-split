@@ -1,5 +1,6 @@
 'use client';
 
+import { useT } from '@/lib/i18n';
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { Calendar, Check, UserPlus, X } from 'lucide-react';
@@ -40,6 +41,7 @@ export default function AddExpenseModal({
   open, onClose, groupId: initialGroupId, onSuccess, expense,
 }: AddExpenseModalProps) {
   const { toast } = useToast();
+  const t = useT();
   const supabase = createClient();
   const isEditing = !!expense;
 
@@ -316,7 +318,7 @@ export default function AddExpenseModal({
       if (error) throw error;
       if (foreign && keepRate) await supabase.rpc('set_trip_rate', { p_group_id: selectedGroupId, p_currency: payCur, p_rate: fxRate });
       try { localStorage.setItem(`tripsplit:paycur:${selectedGroupId}`, foreign ? payCur : ''); } catch {}
-      toast(isEditing ? 'Expense updated' : 'Expense added');
+      toast(isEditing ? t('add.updated') : t('add.added'));
 
       onSuccess?.();
       onClose();
@@ -367,11 +369,11 @@ export default function AddExpenseModal({
 
   // ── Expense form step ──────────────────────────────────────
   return (
-    <Modal open={open} onClose={onClose} title={isEditing ? 'Edit Expense' : 'Add Expense'} size="lg">
+    <Modal open={open} onClose={onClose} title={isEditing ? t('add.editTitle') : t('add.title')} size="lg">
       <form onSubmit={handleSubmit} className="p-4 space-y-4">
         <Input
-          label="Title"
-          placeholder="e.g. Dinner at restaurant"
+          label={t('add.what')}
+          placeholder={t('add.whatHint')}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           required
@@ -379,7 +381,7 @@ export default function AddExpenseModal({
 
         <div className="grid grid-cols-2 gap-3">
           <Input
-            label={`Amount (${sym})`}
+            label={t('add.amount', { sym })}
             type="number"
             inputMode="decimal"
             placeholder="0.00"
@@ -392,7 +394,7 @@ export default function AddExpenseModal({
             required
           />
           <Input
-            label="Date"
+            label={t('add.date')}
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
@@ -404,7 +406,7 @@ export default function AddExpenseModal({
         {fxOk && (
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-sm">
-              <label htmlFor="paycur" className="text-gray-700">Paid in</label>
+              <label htmlFor="paycur" className="text-gray-700">{t('add.paidIn')}</label>
               <select
                 id="paycur"
                 value={effCur}
@@ -432,7 +434,7 @@ export default function AddExpenseModal({
                 {tripRates[payCur] !== parseFloat(rate) && parseFloat(rate) > 0 && (
                   <label className="flex items-center gap-2 text-xs text-gray-600">
                     <input type="checkbox" checked={keepRate} onChange={(e) => setKeepRate(e.target.checked)} />
-                    Use this rate for the whole trip (e.g. what your forex card gave you)
+                    {t('add.keepRate')}
                   </label>
                 )}
               </div>
@@ -442,7 +444,7 @@ export default function AddExpenseModal({
 
         {/* Category */}
         <div>
-          <label className="text-sm font-medium text-gray-700 mb-2 block">Category</label>
+          <label className="text-sm font-medium text-gray-700 mb-2 block">{t('add.category')}</label>
           <div className="flex gap-2 overflow-x-auto -mx-4 px-4 pb-1 no-scrollbar">
             {CATEGORIES.map((c) => (
               <button
@@ -461,7 +463,7 @@ export default function AddExpenseModal({
 
         {/* Paid by — anyone in the group, including people who haven't signed up */}
         <div>
-          <label className="text-sm font-medium text-gray-700 mb-2 block">Paid by</label>
+          <label className="text-sm font-medium text-gray-700 mb-2 block">{t('add.paidBy')}</label>
           <div className="flex gap-2 flex-wrap">
             {participants.map((m) => (
               <button
@@ -484,14 +486,14 @@ export default function AddExpenseModal({
         {/* Split type */}
         {!showSplitTypes ? (
           <p className="text-sm text-gray-700">
-            Split equally{' '}
+            {t('add.splitEqually')}{' '}
             <button type="button" onClick={() => setMoreSplits(true)} className="font-medium text-blue-600">
-              Change
+              {t('add.change')}
             </button>
           </p>
         ) : (
         <div>
-          <label className="text-sm font-medium text-gray-700 mb-2 block">Split type</label>
+          <label className="text-sm font-medium text-gray-700 mb-2 block">{t('add.splitType')}</label>
           <div className="flex gap-2">
             {(['equal', 'percentage', 'fixed'] as SplitType[]).map((type) => (
               <button
@@ -504,7 +506,7 @@ export default function AddExpenseModal({
                     : 'bg-white text-gray-700 border-gray-200'
                 }`}
               >
-                {type === 'percentage' ? '%' : type === 'fixed' ? 'Exact' : 'Equal'}
+                {type === 'percentage' ? '%' : type === 'fixed' ? t('add.exact') : t('add.equal')}
               </button>
             ))}
             <button
@@ -519,7 +521,7 @@ export default function AddExpenseModal({
                 itemMode ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200'
               }`}
             >
-              Items
+              {t('add.items')}
             </button>
           </div>
         </div>
@@ -541,7 +543,7 @@ export default function AddExpenseModal({
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className="text-sm font-medium text-gray-700">
-              Split between ({getIncluded().length}/{participants.length})
+              {t('add.splitBetween')} ({getIncluded().length}/{participants.length})
             </label>
             <button
               type="button"
@@ -653,7 +655,7 @@ export default function AddExpenseModal({
         )}
 
         <Input
-          label="Notes (optional)"
+          label={t('add.notes')}
           placeholder="Add a note..."
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
@@ -662,7 +664,7 @@ export default function AddExpenseModal({
         <div className="flex gap-3 pt-2">
           <Button type="button" variant="secondary" fullWidth onClick={onClose}>Cancel</Button>
           <Button type="submit" fullWidth loading={loading}>
-            {isEditing ? 'Update' : 'Add Expense'}
+            {isEditing ? t('add.update') : t('add.save')}
           </Button>
         </div>
       </form>

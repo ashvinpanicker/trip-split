@@ -1,16 +1,17 @@
 'use client';
 
+import { useT } from '@/lib/i18n';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Home, Users, PlusCircle, BarChart2, User } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 
 const navItems = [
-  { href: '/dashboard', icon: Home, label: 'Home' },
-  { href: '/groups', icon: Users, label: 'Groups' },
-  { href: '/dashboard', icon: PlusCircle, label: 'Add', isAction: true },
-  { href: '/balances', icon: BarChart2, label: 'Balances' },
-  { href: '/profile', icon: User, label: 'Profile' },
+  { href: '/dashboard', icon: Home, label: 'nav.home' as const },
+  { href: '/groups', icon: Users, label: 'nav.groups' as const },
+  { href: '/dashboard', icon: PlusCircle, label: 'nav.add' as const, isAction: true },
+  { href: '/balances', icon: BarChart2, label: 'nav.balances' as const },
+  { href: '/profile', icon: User, label: 'nav.profile' as const },
 ];
 
 interface BottomNavProps {
@@ -19,6 +20,7 @@ interface BottomNavProps {
 
 export default function BottomNav({ onAddExpense }: BottomNavProps) {
   const pathname = usePathname();
+  const t = useT();
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 z-40 safe-area-inset-bottom">
@@ -37,7 +39,7 @@ export default function BottomNav({ onAddExpense }: BottomNavProps) {
                 <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center shadow-lg shadow-blue-200 -mt-4">
                   <Icon size={22} className="text-white" />
                 </div>
-                <span className="text-xs text-gray-400 mt-1">{item.label}</span>
+                <span className="text-xs text-gray-400 mt-1">{t(item.label)}</span>
               </button>
             );
           }
@@ -60,7 +62,7 @@ export default function BottomNav({ onAddExpense }: BottomNavProps) {
                   isActive ? 'text-blue-600 font-medium' : 'text-gray-400'
                 )}
               >
-                {item.label}
+                {t(item.label)}
               </span>
             </Link>
           );
