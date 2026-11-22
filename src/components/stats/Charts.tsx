@@ -22,7 +22,8 @@ export const CAT_COLOR: Record<string, string> = {
   shopping: '#008300',
   other: '#a3a29c',
 };
-const SURFACE = '#ffffff';
+// Theme-aware: globals.css swaps these in dark mode
+const SURFACE = 'var(--chart-surface, #ffffff)';
 const GAIN = '#2a78d6'; // diverging pole: fronted money for others
 const LOSS = '#e34948'; // diverging pole: others paid for them
 const MID = '#d6d5d0'; // neutral zero line
@@ -138,7 +139,7 @@ export function DailyStacked({ stats }: { stats: TripStats }) {
       <svg width={W} height={H} className="block" role="img" aria-label="Spending per day by category">
         {y.ticks(3).map((t) => (
           <g key={t}>
-            <line x1={m.l} x2={plotR} y1={y(t)} y2={y(t)} stroke="#eceae4" />
+            <line x1={m.l} x2={plotR} y1={y(t)} y2={y(t)} stroke="var(--chart-grid, #eceae4)" />
             <text x={m.l - 6} y={y(t)} dy="0.32em" textAnchor="end" className="fill-gray-400 text-[10px] tabular-nums">{compact(t)}</text>
           </g>
         ))}
@@ -173,7 +174,7 @@ export function DailyStacked({ stats }: { stats: TripStats }) {
           );
         })}
         {/* Daily average */}
-        <line x1={m.l} x2={plotR} y1={y(avg)} y2={y(avg)} stroke="#52514e" strokeDasharray="3 3" />
+        <line x1={m.l} x2={plotR} y1={y(avg)} y2={y(avg)} stroke="var(--chart-ink, #52514e)" strokeDasharray="3 3" />
         <text x={plotR} y={y(avg) - 4} textAnchor="end" className="fill-gray-500 text-[10px]">avg {compact(avg)}</text>
       </svg>
     </div>

@@ -12,8 +12,46 @@
   --color-foreground: var(--foreground);
 }
 
-/* App is designed light-only; stop dark-mode phones turning text white on white inputs */
+/* Light by default. Dark mode follows the phone's setting (below); marketing pages (.mk) stay light. */
 :root { color-scheme: light; }
+
+@media (prefers-color-scheme: dark) {
+  body:not(:has(.mk)) {
+    color-scheme: dark; /* native inputs, date pickers and scrollbars go dark too */
+    --color-gray-50: #0b111c;
+    --color-gray-100: #1a2230;
+    --color-gray-200: #283244;
+    --color-gray-300: #3b475b;
+    --color-gray-400: #7d889b;
+    --color-gray-500: #9aa4b5;
+    --color-gray-600: #b6bec9;
+    --color-gray-700: #d0d6de;
+    --color-gray-800: #e4e8ee;
+    --color-gray-900: #f2f4f7;
+    --color-blue-50: #13213b;
+    --color-blue-100: #1a2f55;
+    --color-blue-200: #27467a;
+    --color-red-50: #33151a;
+    --color-red-100: #4a1d24;
+    --color-green-50: #0f2a20;
+    --color-green-100: #15402e;
+    --color-green-200: #1c5a3f;
+    --color-amber-50: #2e230c;
+    --color-amber-100: #3b2c0e;
+    --chart-surface: #121a27;
+    --chart-grid: #2a3446;
+    --chart-ink: #aab3c2;
+  }
+  /* Cards and inputs: a raised dark surface (white text on blue buttons is untouched) */
+  body:not(:has(.mk)) .bg-white { background-color: #121a27; }
+  body:not(:has(.mk)) .hover\:bg-white:hover { background-color: #1a2230; }
+  /* Brighter accents so they stay readable on dark */
+  body:not(:has(.mk)) :is(.text-blue-600, .text-blue-700) { color: #7fa9ff; }
+  body:not(:has(.mk)) :is(.text-red-500, .text-red-600) { color: #ff8a8a; }
+  body:not(:has(.mk)) :is(.text-green-600, .text-green-700) { color: #5ee0a0; }
+  body:not(:has(.mk)) :is(.text-amber-600, .text-amber-700, .text-amber-800, .text-amber-900) { color: #f7c560; }
+  body:not(:has(.mk)) :is(.border-gray-50, .border-gray-100) { border-color: #222b3a; }
+}
 
 /* No sideways scrolling on phones */
 html, body { max-width: 100%; overflow-x: clip; }
