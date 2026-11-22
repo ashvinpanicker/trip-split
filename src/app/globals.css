@@ -16,8 +16,9 @@
 :root { color-scheme: light; }
 
 @media (prefers-color-scheme: dark) {
-  body:not(:has(.mk)) {
-    color-scheme: dark; /* native inputs, date pickers and scrollbars go dark too */
+  html:not(:has(.mk)) {
+    color-scheme: dark; /* native inputs, date pickers, scrollbars and Safari's top bar go dark too */
+    background-color: #0b111c;
     --color-gray-50: #0b111c;
     --color-gray-100: #1a2230;
     --color-gray-200: #283244;
@@ -43,14 +44,14 @@
     --chart-ink: #aab3c2;
   }
   /* Cards and inputs: a raised dark surface (white text on blue buttons is untouched) */
-  body:not(:has(.mk)) .bg-white { background-color: #121a27; }
-  body:not(:has(.mk)) .hover\:bg-white:hover { background-color: #1a2230; }
+  html:not(:has(.mk)) .bg-white { background-color: #121a27; }
+  html:not(:has(.mk)) .hover\:bg-white:hover { background-color: #1a2230; }
   /* Brighter accents so they stay readable on dark */
-  body:not(:has(.mk)) :is(.text-blue-600, .text-blue-700) { color: #7fa9ff; }
-  body:not(:has(.mk)) :is(.text-red-500, .text-red-600) { color: #ff8a8a; }
-  body:not(:has(.mk)) :is(.text-green-600, .text-green-700) { color: #5ee0a0; }
-  body:not(:has(.mk)) :is(.text-amber-600, .text-amber-700, .text-amber-800, .text-amber-900) { color: #f7c560; }
-  body:not(:has(.mk)) :is(.border-gray-50, .border-gray-100) { border-color: #222b3a; }
+  html:not(:has(.mk)) :is(.text-blue-600, .text-blue-700) { color: #7fa9ff; }
+  html:not(:has(.mk)) :is(.text-red-500, .text-red-600) { color: #ff8a8a; }
+  html:not(:has(.mk)) :is(.text-green-600, .text-green-700) { color: #5ee0a0; }
+  html:not(:has(.mk)) :is(.text-amber-600, .text-amber-700, .text-amber-800, .text-amber-900) { color: #f7c560; }
+  html:not(:has(.mk)) :is(.border-gray-50, .border-gray-100) { border-color: #222b3a; }
 }
 
 /* No sideways scrolling on phones */

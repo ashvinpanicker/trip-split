@@ -1,5 +1,6 @@
 'use client';
 
+import PageSkeleton from '@/components/ui/PageSkeleton';
 import { useT } from '@/lib/i18n';
 import { useState, use } from 'react';
 import { useRouter } from 'next/navigation';
@@ -78,7 +79,8 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
     );
   }
 
-  if (!group || !user) return null;
+  if (!group) return <p className="p-6 text-center text-gray-500">This trip doesn&apos;t exist, or you&apos;re not in it.</p>;
+  if (!user) return <PageSkeleton />;
   // Everything below formats money in this trip's currency (symbol only, no conversion)
   setActiveCurrency(group.currency);
 

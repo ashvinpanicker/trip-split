@@ -1,5 +1,6 @@
 'use client';
 
+import PageSkeleton from '@/components/ui/PageSkeleton';
 import { useRouter } from 'next/navigation';
 import { BarChart2, ChevronRight } from 'lucide-react';
 import AppHeader from '@/components/layout/AppHeader';
@@ -20,7 +21,7 @@ export default function BalancesPage() {
   const { groups, loading: groupsLoading } = useGroups();
   const totals = useMyTotals();
 
-  if (!user) return null;
+  if (!user) return <PageSkeleton />;
 
   // Tracking-only trips have no balances
   const perGroup = Object.fromEntries(Object.entries(myNetByGroup(user.id, totals.expenses, totals.payments)).filter(([gid]) => !groups.find((g) => g.id === gid)?.track_only));

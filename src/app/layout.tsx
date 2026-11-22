@@ -24,7 +24,11 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
-  themeColor: '#1a56db',
+  // Browser bar colour follows light/dark so the top of the screen matches the app
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#f9fafb' },
+    { media: '(prefers-color-scheme: dark)', color: '#0b111c' },
+  ],
 };
 
 export default function RootLayout({

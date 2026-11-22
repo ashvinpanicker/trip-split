@@ -3,14 +3,15 @@
 import { useEffect, useState, useCallback } from 'react';
 import { createClient, getAuthUser } from '@/lib/supabase/client';
 import type { Group } from '@/types';
+import { useCachedState, hasCached } from './cache';
 
 export function useGroups() {
-  const [groups, setGroups] = useState<Group[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [groups, setGroups] = useCachedState<Group[]>('groups', []);
+  const [loading, setLoading] = useState(!hasCached('groups'));
   const supabase = createClient();
 
   const load = useCallback(async () => {
-    setLoading(true);
+    if (!hasCached('groups')) setLoading(true);
     const user = await getAuthUser(supabase);
     if (!user) { setLoading(false); return; }
 
@@ -46,12 +47,12 @@ export function useGroups() {
 }
 
 export function useGroup(groupId: string) {
-  const [group, setGroup] = useState<Group | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [group, setGroup] = useCachedState<Group | null>(`group:${groupId}`, null);
+  const [loading, setLoading] = useState(!hasCached(`group:${groupId}`));
   const supabase = createClient();
 
   const load = useCallback(async () => {
-    setLoading(true);
+    if (!hasCached(`group:${groupId}`)) setLoading(true);
 
     const [{ data }, { data: pendingData }] = await Promise.all([
       supabase

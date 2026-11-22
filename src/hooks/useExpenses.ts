@@ -3,14 +3,15 @@
 import { useEffect, useState, useCallback } from 'react';
 import { createClient, getAuthUser } from '@/lib/supabase/client';
 import type { Expense, ExpenseParticipant, SettlementRecord } from '@/types';
+import { useCachedState, hasCached } from './cache';
 
 export function useExpenses(groupId: string) {
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [expenses, setExpenses] = useCachedState<Expense[]>(`expenses:${groupId}`, []);
+  const [loading, setLoading] = useState(!hasCached(`expenses:${groupId}`));
   const supabase = createClient();
 
   const load = useCallback(async () => {
-    setLoading(true);
+    if (!hasCached(`expenses:${groupId}`)) setLoading(true);
     const { data } = await supabase
       .from('expenses')
       .select(`
@@ -42,8 +43,8 @@ export function useExpenses(groupId: string) {
 }
 
 export function useAllExpenses() {
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [expenses, setExpenses] = useCachedState<Expense[]>('expenses:all', []);
+  const [loading, setLoading] = useState(!hasCached('expenses:all'));
   const supabase = createClient();
 
   useEffect(() => {
@@ -88,7 +89,7 @@ export function useAllExpenses() {
 }
 
 export function useSettlements(groupId: string) {
-  const [settlements, setSettlements] = useState<SettlementRecord[]>([]);
+  const [settlements, setSettlements] = useCachedState<SettlementRecord[]>(`payments:${groupId}`, []);
   const supabase = createClient();
 
   const load = useCallback(async () => {
@@ -113,8 +114,8 @@ type TotalsExpense = Pick<Expense, 'id' | 'group_id' | 'paid_by' | 'paid_by_pend
 };
 
 export function useMyTotals() {
-  const [data, setData] = useState<{ expenses: TotalsExpense[]; payments: SettlementRecord[] }>({ expenses: [], payments: [] });
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useCachedState<{ expenses: TotalsExpense[]; payments: SettlementRecord[] }>('totals', { expenses: [], payments: [] });
+  const [loading, setLoading] = useState(!hasCached('totals'));
   const supabase = createClient();
 
   useEffect(() => {

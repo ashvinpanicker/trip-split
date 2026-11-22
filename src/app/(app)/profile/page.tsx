@@ -1,8 +1,10 @@
 'use client';
 
+import PageSkeleton from '@/components/ui/PageSkeleton';
 import { clearOfflineCache, InstallPrompt } from '@/components/pwa/Pwa';
 import PayMethodsEditor from '@/components/profile/PayMethodsEditor';
 import SettingsCard from '@/components/profile/SettingsCard';
+import { clearCache } from '@/hooks/cache';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { LogOut, User, Mail, Edit2, Check, IndianRupee } from 'lucide-react';
@@ -26,6 +28,7 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   async function handleSignOut() {
     await supabase.auth.signOut();
+    clearCache();
     await clearOfflineCache();
     router.push('/login');
   }
@@ -46,8 +49,7 @@ export default function ProfilePage() {
     setSaving(false);
   }
 
-  if (loading) return null;
-  if (!user) return null;
+  if (!user) return <PageSkeleton />;
 
   return (
     <div className="flex flex-col">

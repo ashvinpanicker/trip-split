@@ -16,6 +16,14 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.next({ request });
   }
 
+  // In-app page changes (React Server Component fetches) with a session: skip the Supabase
+  // round-trip so moving between pages is instant. Full page loads still verify the session,
+  // every query is still checked by row-level security, and the app sends you to sign in if it expired.
+  const isAppNavigation = request.headers.get('rsc') === '1' || request.headers.has('next-router-prefetch');
+  if (isAppNavigation && hasSession) {
+    return NextResponse.next({ request });
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(

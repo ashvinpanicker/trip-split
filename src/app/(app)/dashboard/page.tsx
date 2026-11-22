@@ -1,5 +1,6 @@
 'use client';
 
+import PageSkeleton from '@/components/ui/PageSkeleton';
 import { useT } from '@/lib/i18n';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -24,7 +25,7 @@ export default function DashboardPage() {
   const { expenses, loading: expLoading } = useAllExpenses();
   const totals = useMyTotals();
 
-  if (!user) return null;
+  if (!user) return <PageSkeleton />;
 
   // Same maths as the group pages: per-group net (incl. recorded payments), summed per currency
   const colors = groupColors(groups);
