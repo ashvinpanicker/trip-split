@@ -27,7 +27,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <ServiceWorker />
       <div className="flex flex-col min-h-screen bg-gray-50">
         <OfflineBanner />
-        <main className="flex-1 pb-20">
+        <main className="flex-1 pb-[calc(7rem+env(safe-area-inset-bottom))]">
           {ready ? children : <PageSkeleton />}
         </main>
         <BottomNav onAddExpense={() => setShowAddExpense(true)} />

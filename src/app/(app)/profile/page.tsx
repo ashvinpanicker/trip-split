@@ -1,14 +1,10 @@
 'use client';
 
 import PageSkeleton from '@/components/ui/PageSkeleton';
-import { clearOfflineCache, InstallPrompt } from '@/components/pwa/Pwa';
 import PayMethodsEditor from '@/components/profile/PayMethodsEditor';
-import SettingsCard from '@/components/profile/SettingsCard';
-import { clearCache } from '@/hooks/cache';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { LogOut, User, Mail, Edit2, Check, IndianRupee } from 'lucide-react';
-import SupportLinks from '@/components/SupportLinks';
+import { ArrowLeft, User, Mail, Edit2, Check } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import AppHeader from '@/components/layout/AppHeader';
 import Avatar from '@/components/ui/Avatar';
@@ -26,12 +22,6 @@ export default function ProfilePage() {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState('');
   const [saving, setSaving] = useState(false);
-  async function handleSignOut() {
-    await supabase.auth.signOut();
-    clearCache();
-    await clearOfflineCache();
-    router.push('/login');
-  }
 
   async function handleSaveName() {
     if (!name.trim() || !user) return;
@@ -53,7 +43,10 @@ export default function ProfilePage() {
 
   return (
     <div className="flex flex-col">
-      <AppHeader title="Profile" />
+      <AppHeader
+        title="Profile"
+        left={<button onClick={() => router.back()} aria-label="Back" className="p-1 hover:bg-gray-100 rounded-lg"><ArrowLeft size={20} className="text-gray-600" /></button>}
+      />
 
       <div className="p-4 space-y-4">
         {/* Avatar + name */}
@@ -112,18 +105,6 @@ export default function ProfilePage() {
 
         <PayMethodsEditor userId={user.id} initial={(user as any).pay_methods} legacyUpi={user.upi_id} />
 
-        <SettingsCard />
-
-        <InstallPrompt persistent />
-
-        <Button variant="danger" fullWidth onClick={handleSignOut}>
-          <LogOut size={16} className="mr-2" /> Sign out
-        </Button>
-
-        <div className="text-center text-xs text-gray-500 pt-2">
-          <p>TripSplit is free and open source. <a href="https://github.com/ashvinpanicker/trip-split" className="underline">Source code</a></p>
-          <SupportLinks className="mt-1 [&_div]:justify-center" />
-        </div>
       </div>
     </div>
   );

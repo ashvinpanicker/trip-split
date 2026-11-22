@@ -15,7 +15,7 @@ export const LANGS = [
 export type Lang = (typeof LANGS)[number]['code'];
 
 const en = {
-  'nav.home': 'Home', 'nav.groups': 'Groups', 'nav.add': 'Add', 'nav.balances': 'Balances', 'nav.profile': 'Profile',
+  'nav.home': 'Home', 'nav.groups': 'Groups', 'nav.add': 'Add', 'nav.balances': 'Balances', 'nav.profile': 'Profile', 'nav.settings': 'Settings',
   'you': 'You', 'someone': 'Someone',
   'dash.hi': 'Hi, {name} 👋', 'dash.summary': "Here's your summary", 'dash.net': 'Net balance',
   'dash.owed': 'You are owed', 'dash.owe': 'You owe', 'dash.groups': 'Your groups', 'dash.seeAll': 'See all',
@@ -40,7 +40,7 @@ const en = {
   'settle.address': '{method} address', 'settle.addMethods': 'Add UPI, PayPal, crypto and more in Profile so friends can pay you in one tap.',
   'settle.remindText': 'Hey {name}, quick nudge from {trip}: you owe me {amount}. See it and pay in one tap here: {link}',
   'settings.advanced': 'Advanced features', 'settings.advancedHint': 'Stats, activity log, CSV export and %, exact or item-wise splits.',
-  'settings.adminsDefault': ' Trip admins see them until you choose here.', 'settings.language': 'Language',
+  'settings.adminsDefault': ' Trip admins see them until you choose here.', 'settings.language': 'Language', 'settings.profileHint': 'Name, email and how friends pay you', 'settings.feedback': 'Send feedback', 'settings.signOut': 'Sign out',
   'link.hi': 'Hi {name}', 'link.settled': "You're all settled up 🎉", 'link.owe': 'You owe {amount}', 'link.get': 'You get back {amount}',
   'link.share': 'Your share of {n} expenses: {amount}', 'link.pay': 'Pay {name} {amount}', 'link.paysYou': '{name} pays you {amount}',
   'link.noMethod': "{name} hasn't added a payment method yet. Pay them however you usually do.",
@@ -50,7 +50,7 @@ const en = {
 type Key = keyof typeof en;
 
 const hi: Partial<Record<Key, string>> = {
-  'nav.home': 'होम', 'nav.groups': 'ग्रुप', 'nav.add': 'जोड़ें', 'nav.balances': 'हिसाब', 'nav.profile': 'प्रोफ़ाइल',
+  'nav.home': 'होम', 'nav.groups': 'ग्रुप', 'nav.add': 'जोड़ें', 'nav.balances': 'हिसाब', 'nav.profile': 'प्रोफ़ाइल', 'nav.settings': 'सेटिंग्स',
   'you': 'आप', 'someone': 'कोई',
   'dash.hi': 'नमस्ते, {name} 👋', 'dash.summary': 'आपका हिसाब एक नज़र में', 'dash.net': 'कुल बैलेंस',
   'dash.owed': 'आपको मिलने हैं', 'dash.owe': 'आपको देने हैं', 'dash.groups': 'आपके ग्रुप', 'dash.seeAll': 'सब देखें',
@@ -75,7 +75,7 @@ const hi: Partial<Record<Key, string>> = {
   'settle.address': '{method} पता', 'settle.addMethods': 'प्रोफ़ाइल में UPI, PayPal वगैरह जोड़िए, ताकि दोस्त एक टैप में पैसे दे सकें।',
   'settle.remindText': 'हाय {name}, {trip} का हिसाब: आपको मुझे {amount} देने हैं। यहाँ देखिए और एक टैप में दीजिए: {link}',
   'settings.advanced': 'एडवांस्ड फ़ीचर', 'settings.advancedHint': 'आँकड़े, गतिविधि, CSV और %, तय रकम या आइटम से बाँटना।',
-  'settings.adminsDefault': ' जब तक आप न चुनें, ट्रिप एडमिन को ये दिखते हैं।', 'settings.language': 'भाषा',
+  'settings.adminsDefault': ' जब तक आप न चुनें, ट्रिप एडमिन को ये दिखते हैं।', 'settings.language': 'भाषा', 'settings.profileHint': 'नाम, ईमेल और दोस्त आपको पैसे कैसे दें', 'settings.feedback': 'सुझाव भेजें', 'settings.signOut': 'साइन आउट',
   'link.hi': 'नमस्ते {name}', 'link.settled': 'आपका सब हिसाब बराबर है 🎉', 'link.owe': 'आपको {amount} देने हैं', 'link.get': 'आपको {amount} वापस मिलने हैं',
   'link.share': '{n} खर्चों में आपका हिस्सा: {amount}', 'link.pay': '{name} को {amount} दें', 'link.paysYou': '{name} आपको {amount} देंगे',
   'link.noMethod': '{name} ने अभी पेमेंट का तरीका नहीं जोड़ा। जैसे हमेशा देते हैं, वैसे दे दीजिए।',

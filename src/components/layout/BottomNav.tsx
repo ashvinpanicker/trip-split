@@ -3,7 +3,7 @@
 import { useT } from '@/lib/i18n';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Users, PlusCircle, BarChart2, User } from 'lucide-react';
+import { Home, Users, PlusCircle, BarChart2, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 
 const navItems = [
@@ -11,7 +11,7 @@ const navItems = [
   { href: '/groups', icon: Users, label: 'nav.groups' as const },
   { href: '/dashboard', icon: PlusCircle, label: 'nav.add' as const, isAction: true },
   { href: '/balances', icon: BarChart2, label: 'nav.balances' as const },
-  { href: '/profile', icon: User, label: 'nav.profile' as const },
+  { href: '/settings', icon: Settings, label: 'nav.settings' as const },
 ];
 
 interface BottomNavProps {
@@ -36,7 +36,7 @@ export default function BottomNav({ onAddExpense }: BottomNavProps) {
                 onClick={onAddExpense}
                 className="flex flex-col items-center pt-2 pb-1 px-3"
               >
-                <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center shadow-lg shadow-blue-200 -mt-4">
+                <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center shadow-lg shadow-blue-200 dark:shadow-blue-950/60 -mt-4">
                   <Icon size={22} className="text-white" />
                 </div>
                 <span className="text-xs text-gray-400 mt-1">{t(item.label)}</span>

@@ -3,6 +3,7 @@
 import PageSkeleton from '@/components/ui/PageSkeleton';
 import { useT } from '@/lib/i18n';
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Bell, TrendingUp, TrendingDown, Users } from 'lucide-react';
 import AppHeader from '@/components/layout/AppHeader';
@@ -47,7 +48,7 @@ export default function DashboardPage() {
       <AppHeader
         title={t('dash.hi', { name: user.full_name?.split(' ')[0] || '' }).replace(', 👋', ' 👋')}
         subtitle={t('dash.summary')}
-        right={<Avatar src={user.avatar_url} name={user.full_name || user.email} size="sm" />}
+        right={<Link href="/profile" aria-label="Your profile"><Avatar src={user.avatar_url} name={user.full_name || user.email} size="sm" /></Link>}
       />
       <InstallPrompt />
 
