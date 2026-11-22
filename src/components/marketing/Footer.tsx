@@ -30,7 +30,8 @@ export default function Footer() {
         </div>
       </div>
       <p className="wrap pb-3 text-sm text-[var(--ink-soft)]">
-        Built on Next.js, Supabase and Cloudflare. Sign in with Google or email.
+        <span className="block sm:inline">Built on Next.js, Supabase and Cloudflare.</span>{' '}
+        <Link href="/login" className="block sm:inline underline underline-offset-4 hover:text-[var(--blue)]">Sign in with Google or email</Link>
       </p>
       <p className="wrap pb-10 text-xs text-[var(--ink-soft)]">
         Splitwise is a trademark of Splitwise, Inc. TripSplit is an independent open-source project and is not affiliated with Splitwise.

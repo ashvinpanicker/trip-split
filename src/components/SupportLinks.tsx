@@ -40,8 +40,12 @@ export default function SupportLinks({ className = '' }: { className?: string })
         <span>
           Made with <span role="img" aria-label="love" className="text-[#b54141]">♥</span> by{' '}
           <a href={AUTHOR.url} className="font-semibold underline decoration-dotted underline-offset-4" rel="noopener">ashvinpanicker</a>
-          {hasSupport && ' · Buy me a coffee ☕'}
         </span>
+        {/* Own line on phones so the tip icons sit next to it instead of wrapping alone */}
+        {hasSupport && <>
+          <span className="basis-full h-0 sm:hidden" aria-hidden />
+          <span><span className="hidden sm:inline">· </span>Buy me a coffee ☕</span>
+        </>}
         {TIPS.map((t) => (
           <button
             key={t.label}

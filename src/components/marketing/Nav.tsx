@@ -3,7 +3,7 @@ import { LogoMark } from '@/components/Logo';
 
 export default function Nav() {
   return (
-    <header className="wrap flex items-center justify-between h-16">
+    <header className="wrap flex items-center justify-between min-h-16 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3">
       <Link href="/" className="flex items-center gap-2 font-bold text-lg tracking-tight" aria-label="TripSplit home">
         <LogoMark size={32} />
         TripSplit

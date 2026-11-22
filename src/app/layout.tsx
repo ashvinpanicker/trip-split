@@ -26,7 +26,7 @@ export const viewport: Viewport = {
   viewportFit: 'cover',
   // Browser bar colour follows light/dark so the top of the screen matches the app
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#f9fafb' },
+    { media: '(prefers-color-scheme: light)', color: '#f7f9fc' },
     { media: '(prefers-color-scheme: dark)', color: '#0b111c' },
   ],
 };

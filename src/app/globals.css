@@ -12,6 +12,9 @@
   --color-foreground: var(--foreground);
 }
 
+/* Marketing pages: the area behind the iPhone status bar uses the page's own paper colour */
+html:has(.mk) { background-color: #f7f9fc; }
+
 /* Light by default. Dark mode follows the phone's setting (below); marketing pages (.mk) stay light. */
 :root { color-scheme: light; }
 
