@@ -1,7 +1,9 @@
 'use client';
 
 import { format } from 'date-fns';
-import { Printer } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Download, Loader2, Moon, Sun } from 'lucide-react';
+import { elementToPdf } from '@/lib/utils/pdf';
 import { formatCurrency } from '@/lib/utils/balance';
 import { statementRows } from '@/lib/utils/statement';
 import { tripStats } from '@/lib/utils/stats';
@@ -33,6 +35,30 @@ export default function Statement({ tripName, currency, persons, expenses, payme
 }) {
   // Whole amounts without .00 so the table fits on a phone
   const money = (n: number) => formatCurrency(n, currency).replace(/[.,]00(?!\d)/, '');
+  const ref = useRef<HTMLDivElement>(null);
+  const [busy, setBusy] = useState(false);
+  // Light or dark, for the page and the PDF. Starts from the phone's setting.
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  useEffect(() => {
+    let saved: string | null = null;
+    try { saved = localStorage.getItem('tripsplit:statement-theme'); } catch {}
+    setTheme(saved === 'dark' || saved === 'light' ? saved : matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  }, []);
+  function pickTheme(t: 'light' | 'dark') {
+    setTheme(t);
+    try { localStorage.setItem('tripsplit:statement-theme', t); } catch {}
+  }
+  async function savePdf() {
+    if (!ref.current || busy) return;
+    setBusy(true);
+    try {
+      await elementToPdf(ref.current, `${tripName.replace(/[^\w -]/g, '').trim() || 'Trip'} - TripSplit.pdf`, theme === 'dark' ? '#121a27' : '#ffffff');
+    } catch {
+      alert('Couldn\u2019t make the PDF on this device. Try again, or take screenshots.');
+    } finally {
+      setBusy(false);
+    }
+  }
   const name = (id: string | null | undefined) => persons.find((p) => p.id === id)?.name ?? '—';
   const { rows, totals, checks } = statementRows(expenses, persons, payments);
   const stats = tripStats(expenses.map((e) => ({ ...e, category: e.category ?? null, created_by: e.created_by ?? null })) as any, persons);
@@ -42,7 +68,7 @@ export default function Statement({ tripName, currency, persons, expenses, payme
   const num = 'text-right tabular-nums whitespace-nowrap';
 
   return (
-    <div className="statement max-w-3xl mx-auto px-4 py-6 text-sm text-gray-900 bg-white min-h-screen">
+    <div ref={ref} className={`statement theme-${theme} max-w-3xl mx-auto px-4 py-6 text-sm text-gray-900 bg-white min-h-screen`}>
       <style>{`@media print {
         @page { margin: 12mm; }
         nav, .no-print { display: none !important; }
@@ -59,9 +85,21 @@ export default function Statement({ tripName, currency, persons, expenses, payme
             {expenses.length} expenses · {money(totals.paid)} in total · made {format(new Date(), 'd MMM yyyy, h:mm a')}
           </p>
         </div>
-        <button onClick={() => window.print()} className="no-print shrink-0 inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-blue-600 text-white font-semibold">
-          <Printer size={16} /> Save as PDF
-        </button>
+        <div className="no-print shrink-0 flex flex-col items-end gap-2">
+          <button onClick={savePdf} disabled={busy} className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-blue-600 text-white font-semibold disabled:opacity-60">
+            {busy ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />} {busy ? 'Making PDF…' : 'Save as PDF'}
+          </button>
+          <div role="radiogroup" aria-label="Statement theme" className="inline-flex rounded-lg border border-gray-200 p-0.5 text-xs">
+            {(['light', 'dark'] as const).map((t) => (
+              <button
+                key={t} role="radio" aria-checked={theme === t} onClick={() => pickTheme(t)}
+                className={`inline-flex items-center gap-1 h-7 px-2.5 rounded-md ${theme === t ? 'bg-gray-100 text-gray-900 font-medium' : 'text-gray-500'}`}
+              >
+                {t === 'light' ? <Sun size={13} /> : <Moon size={13} />} {t === 'light' ? 'Light' : 'Dark'}
+              </button>
+            ))}
+          </div>
+        </div>
       </header>
 
       {stats.count > 0 && (
