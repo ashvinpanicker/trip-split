@@ -43,10 +43,10 @@ export default function GroupsPage() {
           )}
           <div className="flex items-center gap-3 mt-1">
             <span className="flex items-center gap-1 text-xs text-gray-400">
-              <Users size={11} /> {group.member_count} members
+              <Users size={11} /> {group.member_count} {group.member_count === 1 ? 'person' : 'people'}
             </span>
             <span className="flex items-center gap-1 text-xs text-gray-400">
-              <Receipt size={11} /> {group.total_expenses} expenses
+              <Receipt size={11} /> {group.total_expenses} {group.total_expenses === 1 ? 'expense' : 'expenses'}
             </span>
           </div>
         </div>

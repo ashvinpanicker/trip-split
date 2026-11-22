@@ -180,7 +180,7 @@ export default function ExpenseCard({ expense, currentUserId, onDelete, onUpdate
               className="flex items-center gap-1 mt-2 text-xs text-blue-600"
             >
               {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-              {expense.participants?.length || 0} participants · {expense.items ? 'itemized bill' : `${expense.split_type} split`}
+              {expense.participants?.length || 0} {expense.participants?.length === 1 ? 'person' : 'people'} · {expense.items ? 'itemized bill' : `${expense.split_type} split`}
               {expense.receipt_path && <Paperclip size={12} className="ml-1" />}
             </button>
           </div>

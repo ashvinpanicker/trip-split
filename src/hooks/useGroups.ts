@@ -21,6 +21,7 @@ export function useGroups() {
         group:groups (
           id, name, description, created_by, invite_code, currency, kind, track_only, archived_at, created_at, updated_at,
           member_count:group_members(count),
+          pending:pending_members(claimed_by),
           expenses(count)
         )
       `)
@@ -33,7 +34,8 @@ export function useGroups() {
         .filter(Boolean)
         .map((g: any) => ({
           ...g,
-          member_count: g.member_count?.[0]?.count ?? 0,
+          // Everyone on the trip, including people added by name who haven't joined yet
+          member_count: (g.member_count?.[0]?.count ?? 0) + (g.pending ?? []).filter((p: { claimed_by: string | null }) => !p.claimed_by).length,
           total_expenses: g.expenses?.[0]?.count ?? 0,
         }));
       setGroups(g as Group[]);

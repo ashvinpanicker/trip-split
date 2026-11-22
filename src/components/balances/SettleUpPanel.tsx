@@ -62,7 +62,7 @@ export default function SettleUpPanel({
     });
     const when = format(new Date(), 'd MMM, h:mm a');
     return `💸 ${groupName}: settle up (${plan.length} payment${plan.length === 1 ? '' : 's'})\nUpdated ${when}\n\n${lines.join('\n')}\n\n` +
-      `Paid someone? Tap “Mark paid” in TripSplit so everyone’s balance updates.\n` +
+      `Paid? Tap “I’ve paid” in TripSplit so you’re off the list.\n` +
       `Check the maths: ${window.location.origin}/groups/${groupId}/statement`;
   }
   const [copied, setCopied] = useState(false);

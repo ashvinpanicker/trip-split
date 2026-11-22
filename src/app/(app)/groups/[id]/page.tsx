@@ -70,6 +70,7 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
   const [query, setQuery] = useState('');
   const [catFilter, setCatFilter] = useState<string | null>(null);
   const [payerFilter, setPayerFilter] = useState<string | null>(null);
+  const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
   // One signal for "something changed": expenses, totals and the activity feed all reload on it
   const changed = () => window.dispatchEvent(new Event('tripsplit:expenses-changed'));
   // Payments saved offline count straight away, so nobody taps "Mark paid" twice
@@ -129,9 +130,9 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
   const views: { key: Tab; label: string }[] = [
     { key: 'expenses', label: t('trip.tab.expenses') },
     ...(trackOnly ? [] : [{ key: 'balances' as Tab, label: t('trip.tab.balances') }]),
-    ...(advanced ? [{ key: 'stats' as Tab, label: t('trip.tab.stats') }] : []),
+    { key: 'stats' as Tab, label: t('trip.tab.stats') },
   ];
-  const view = (trackOnly && tab === 'balances') || (!advanced && (tab === 'stats' || tab === 'activity')) ? 'expenses' : tab;
+  const view = (trackOnly && tab === 'balances') || (!advanced && tab === 'activity') ? 'expenses' : tab;
   const myPaid = stats.paidUpfront.find((p) => p.id === user.id)?.total ?? 0;
   const shown = filterExpenses(expenses, { query, category: catFilter, payer: payerFilter });
 
@@ -176,6 +177,14 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
     else { toast(next ? 'Payments simplified for everyone' : 'Back to paying by person'); refetchGroup(); }
   }
 
+  async function renamePending(pendingId: string, current: string) {
+    const name = renaming?.name.trim();
+    setRenaming(null);
+    if (!name || name === current) return;
+    const { error } = await createClient().rpc('rename_pending', { p_pending_id: pendingId, p_name: name });
+    if (error) toast(/rename_pending/.test(error.message) ? 'Renaming needs a quick database update' : error.message, 'error');
+    else { toast('Renamed'); refetchGroup(); changed(); }
+  }
   async function setRole(userId: string, role: 'admin' | 'member') {
     const { error } = await createClient().rpc('set_member_role', { p_group_id: id, p_user_id: userId, p_role: role });
     if (error) toast(error.message, 'error');
@@ -506,10 +515,26 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
                       <div key={pm.id} className={`px-4 py-3 ${idx > 0 ? 'border-t border-gray-50' : ''}`}>
                         <div className="flex items-center gap-3">
                           <Avatar name={pm.name} size="md" />
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-gray-900 truncate">{pm.name}</p>
-                            <p className="text-xs text-amber-600">Hasn&apos;t joined yet</p>
-                          </div>
+                          {renaming?.id === pm.id ? (
+                            <form className="flex-1 min-w-0 flex gap-2" onSubmit={(e) => { e.preventDefault(); renamePending(pm.id, pm.name); }}>
+                              <input
+                                autoFocus
+                                value={renaming?.name ?? ""}
+                                maxLength={60}
+                                onChange={(e) => setRenaming({ id: pm.id, name: e.target.value })}
+                                className="flex-1 min-w-0 h-9 rounded-lg border border-gray-200 bg-white px-2 text-sm text-gray-900"
+                              />
+                              <button className="text-sm font-medium text-blue-600">Save</button>
+                            </form>
+                          ) : (
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-gray-900 truncate">{pm.name}</p>
+                              <p className="text-xs text-amber-600">
+                                Hasn&apos;t joined yet
+                                {isAdmin && <> · <button onClick={() => setRenaming({ id: pm.id, name: pm.name })} className="font-medium text-blue-600">Rename</button></>}
+                              </p>
+                            </div>
+                          )}
                           <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">pending</span>
                         </div>
                         <div className="mt-2 flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">

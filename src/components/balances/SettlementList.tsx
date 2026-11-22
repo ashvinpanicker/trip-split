@@ -234,9 +234,12 @@ export default function SettlementList({
                 <button
                   onClick={() => markPaid(s, i)}
                   disabled={savingIdx !== null}
-                  className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-lg bg-white border border-gray-200 text-gray-700 text-sm font-medium active:bg-gray-50 disabled:opacity-50"
+                  // The payer is the one who wants off the hook, so for them this is the main button
+                  className={`flex-1 flex items-center justify-center gap-1.5 h-9 rounded-lg text-sm font-medium disabled:opacity-50 ${
+                    isYouPaying ? 'bg-green-600 text-white font-semibold' : 'bg-white border border-gray-200 text-gray-700'
+                  }`}
                 >
-                  <Check size={14} /> {savingIdx === i ? t('settle.saving') : isYouReceiving ? t('settle.gotIt') : t('settle.markPaid')}
+                  <Check size={14} /> {savingIdx === i ? t('settle.saving') : isYouReceiving ? t('settle.gotIt') : t('settle.iPaid')}
                 </button>
               </div>
               </div>

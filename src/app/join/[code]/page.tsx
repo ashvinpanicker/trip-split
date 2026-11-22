@@ -1,5 +1,6 @@
 'use client';
 
+import { applyAppMode } from '@/hooks/useAdvanced';
 import GoogleSignIn from '@/components/auth/GoogleSignIn';
 import { useEffect, useRef, useState, use } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -30,6 +31,8 @@ export default function JoinPage({ params }: { params: Promise<{ code: string }>
   const router = useRouter();
   const searchParams = useSearchParams();
   const personalToken = searchParams.get('for');
+  // Simple or full app, as chosen by whoever shared the link
+  useEffect(() => { applyAppMode(searchParams.get('app')); }, [searchParams]);
   const supabase = createClient();
   const [pickedId, setPickedId] = useState<string | null>(searchParams.get('as'));
   const [unclaimed, setUnclaimed] = useState<{ id: string; name: string }[]>([]);

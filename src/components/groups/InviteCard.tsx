@@ -11,8 +11,10 @@ interface InviteCardProps {
 
 export default function InviteCard({ inviteCode, groupName }: InviteCardProps) {
   const [copied, setCopied] = useState(false);
+  // Simple for most friends; Full for the ones who'll want splits by item, stats and the activity log
+  const [mode, setMode] = useState<'simple' | 'full'>('simple');
 
-  const link = typeof window !== 'undefined' ? `${window.location.origin}/join/${inviteCode}` : '';
+  const link = typeof window !== 'undefined' ? `${window.location.origin}/join/${inviteCode}?app=${mode}` : '';
 
   async function copyCode() {
     await navigator.clipboard.writeText(link);
@@ -34,6 +36,24 @@ export default function InviteCard({ inviteCode, groupName }: InviteCardProps) {
   return (
     <Card className="bg-blue-50 border-blue-100">
       <p className="text-xs font-medium text-blue-700 mb-2">One link for the whole group — drop it in WhatsApp</p>
+      <div role="radiogroup" aria-label="App for people who join" className="grid grid-cols-2 gap-1 rounded-xl bg-white/70 p-1 mb-2">
+        {([['simple', 'Simple app'], ['full', 'Full app']] as const).map(([key, label]) => (
+          <button
+            key={key}
+            role="radio"
+            aria-checked={mode === key}
+            onClick={() => setMode(key)}
+            className={`h-8 rounded-lg text-sm font-medium ${mode === key ? 'bg-blue-600 text-white' : 'text-blue-700'}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <p className="text-xs text-blue-700/80 mb-2">
+        {mode === 'simple'
+          ? 'Just add a bill and see what you owe. Best for most friends.'
+          : 'Adds item and % splits, the activity log and more. They can switch any time in Settings.'}
+      </p>
       <div className="flex items-center gap-2">
         <div className="flex-1 min-w-0 bg-white rounded-xl px-3 py-2.5 border border-blue-100">
           <p className="text-sm font-medium text-gray-900 truncate">{link.replace(/^https?:\/\//, '')}</p>
