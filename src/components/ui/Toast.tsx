@@ -40,7 +40,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             key={t.id}
             className={cn(
               'flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg text-white text-sm font-medium max-w-sm w-full pointer-events-auto',
-              t.type === 'success' ? 'bg-gray-900' : 'bg-red-600'
+              t.type === 'success' ? 'toast-ok bg-gray-900' : 'bg-red-600'
             )}
           >
             {t.type === 'success' ? <CheckCircle size={16} /> : <XCircle size={16} />}
