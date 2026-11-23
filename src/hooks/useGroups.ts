@@ -1,25 +1,27 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { createClient, getAuthUser } from '@/lib/supabase/client';
 import type { Group } from '@/types';
+import { useCachedState, hasCached, useRefreshOn } from './cache';
 
 export function useGroups() {
-  const [groups, setGroups] = useState<Group[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [groups, setGroups] = useCachedState<Group[]>('groups', []);
+  const [loading, setLoading] = useState(!hasCached('groups'));
   const supabase = createClient();
 
   const load = useCallback(async () => {
-    setLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
+    if (!hasCached('groups')) setLoading(true);
+    const user = await getAuthUser(supabase);
     if (!user) { setLoading(false); return; }
 
     const { data } = await supabase
       .from('group_members')
       .select(`
         group:groups (
-          id, name, description, created_by, invite_code, created_at, updated_at,
+          id, name, description, created_by, invite_code, currency, kind, track_only, archived_at, created_at, updated_at,
           member_count:group_members(count),
+          pending:pending_members(claimed_by),
           expenses(count)
         )
       `)
@@ -32,13 +34,15 @@ export function useGroups() {
         .filter(Boolean)
         .map((g: any) => ({
           ...g,
-          member_count: g.member_count?.[0]?.count ?? 0,
+          // Everyone on the trip, including people added by name who haven't joined yet
+          member_count: (g.member_count?.[0]?.count ?? 0) + (g.pending ?? []).filter((p: { claimed_by: string | null }) => !p.claimed_by).length,
           total_expenses: g.expenses?.[0]?.count ?? 0,
         }));
       setGroups(g as Group[]);
     }
     setLoading(false);
   }, []);
+  useRefreshOn(load);
 
   useEffect(() => { load(); }, [load]);
 
@@ -46,12 +50,12 @@ export function useGroups() {
 }
 
 export function useGroup(groupId: string) {
-  const [group, setGroup] = useState<Group | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [group, setGroup] = useCachedState<Group | null>(`group:${groupId}`, null);
+  const [loading, setLoading] = useState(!hasCached(`group:${groupId}`));
   const supabase = createClient();
 
   const load = useCallback(async () => {
-    setLoading(true);
+    if (!hasCached(`group:${groupId}`)) setLoading(true);
 
     const [{ data }, { data: pendingData }] = await Promise.all([
       supabase
@@ -59,8 +63,8 @@ export function useGroup(groupId: string) {
         .select(`
           *,
           members:group_members(
-            id, user_id, role, joined_at,
-            profile:profiles(id, email, full_name, avatar_url)
+            *,
+            profile:profiles(id, email, full_name, avatar_url, upi_id, pay_methods)
           )
         `)
         .eq('id', groupId)
@@ -68,13 +72,14 @@ export function useGroup(groupId: string) {
       // Separate query so a missing table doesn't break the whole page
       supabase
         .from('pending_members')
-        .select('id, name, email, invite_token, claimed_by, claimed_at, created_at')
+        .select('*')
         .eq('group_id', groupId),
     ]);
 
     setGroup(data ? { ...data, pending_members: pendingData ?? [] } as Group : null);
     setLoading(false);
   }, [groupId]);
+  useRefreshOn(load);
 
   useEffect(() => { load(); }, [load]);
 

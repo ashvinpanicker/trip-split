@@ -2,6 +2,8 @@
 
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
 import { CheckCircle, XCircle, X } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
+import { spring } from '@/lib/motion';
 import { cn } from '@/lib/utils/cn';
 
 type ToastType = 'success' | 'error';
@@ -35,21 +37,28 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <ToastContext.Provider value={{ toast }}>
       {children}
       <div className="fixed bottom-24 left-0 right-0 flex flex-col items-center gap-2 z-50 px-4 pointer-events-none">
+        <AnimatePresence initial={false}>
         {toasts.map((t) => (
-          <div
+          <motion.div
             key={t.id}
+            layout
+            initial={{ opacity: 0, y: 16, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.12 } }}
+            transition={spring}
             className={cn(
               'flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg text-white text-sm font-medium max-w-sm w-full pointer-events-auto',
-              t.type === 'success' ? 'bg-gray-900' : 'bg-red-600'
+              t.type === 'success' ? 'toast-ok bg-gray-900' : 'bg-red-600'
             )}
           >
             {t.type === 'success' ? <CheckCircle size={16} /> : <XCircle size={16} />}
-            <span className="flex-1">{t.message}</span>
+            <span className="flex-1 min-w-0 break-words">{t.message}</span>
             <button onClick={() => remove(t.id)} className="ml-1">
               <X size={14} />
             </button>
-          </div>
+          </motion.div>
         ))}
+        </AnimatePresence>
       </div>
     </ToastContext.Provider>
   );

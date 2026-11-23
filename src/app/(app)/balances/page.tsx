@@ -1,104 +1,84 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { BarChart2 } from 'lucide-react';
+import PageSkeleton from '@/components/ui/PageSkeleton';
+import { useRouter } from 'next/navigation';
+import { BarChart2, ChevronRight } from 'lucide-react';
 import AppHeader from '@/components/layout/AppHeader';
 import Card from '@/components/ui/Card';
 import EmptyState from '@/components/ui/EmptyState';
-import BalanceList from '@/components/balances/BalanceList';
-import SettlementList from '@/components/balances/SettlementList';
 import { useUser } from '@/hooks/useUser';
 import { useGroups } from '@/hooks/useGroups';
-import { createClient } from '@/lib/supabase/client';
-import { calculateGroupBalances, simplifyDebts, formatCurrency, type BalancePerson } from '@/lib/utils/balance';
-import type { Balance, Settlement, Expense, ExpenseParticipant } from '@/types';
+import { useMyTotals } from '@/hooks/useExpenses';
+import { formatCurrency, myNetByGroup, totalsByCurrency } from '@/lib/utils/balance';
 
+/**
+ * Your balance in each trip. Groups are kept separate: each has its own currency and its own
+ * settle-up rules, so we never net or simplify across groups. Tap a trip to settle up there.
+ */
 export default function BalancesPage() {
+  const router = useRouter();
   const { user } = useUser();
-  const { groups } = useGroups();
-  const [allBalances, setAllBalances] = useState<Balance[]>([]);
-  const [allSettlements, setAllSettlements] = useState<Settlement[]>([]);
-  const [loading, setLoading] = useState(true);
-  const supabase = createClient();
+  const { groups, loading: groupsLoading } = useGroups();
+  const totals = useMyTotals();
 
-  useEffect(() => {
-    if (!user || groups.length === 0) { setLoading(false); return; }
+  if (!user) return <PageSkeleton />;
 
-    async function loadAll() {
-      setLoading(true);
-      const groupIds = groups.map((g) => g.id);
-
-      const [{ data: expensesData }, { data: membersData }, { data: pendingData }] = await Promise.all([
-        supabase
-          .from('expenses')
-          .select(`id, group_id, paid_by, amount, split_type, date,
-            participants:expense_participants(user_id, pending_member_id, share_amount, share_percentage)`)
-          .in('group_id', groupIds),
-        supabase
-          .from('group_members')
-          .select('user_id, profile:profiles(id, email, full_name, avatar_url)')
-          .in('group_id', groupIds),
-        supabase
-          .from('pending_members')
-          .select('id, name')
-          .in('group_id', groupIds)
-          .is('claimed_by', null),
-      ]);
-
-      const uniquePersons: Record<string, BalancePerson> = {};
-      for (const m of membersData || []) {
-        const p = m.profile as any;
-        if (p) uniquePersons[p.id] = { id: p.id, name: p.full_name || p.email, avatar_url: p.avatar_url };
-      }
-      for (const pm of pendingData || []) {
-        uniquePersons[pm.id] = { id: pm.id, name: pm.name, is_pending: true };
-      }
-
-      const expenses = (expensesData || []) as (Expense & { participants: ExpenseParticipant[] })[];
-      const persons = Object.values(uniquePersons);
-
-      setAllBalances(calculateGroupBalances(expenses, persons));
-      setAllSettlements(simplifyDebts(calculateGroupBalances(expenses, persons)));
-      setLoading(false);
-    }
-
-    loadAll();
-  }, [user, groups]);
-
-  if (!user) return null;
-
-  const myBalance = allBalances.find((b) => b.person_id === user.id);
+  // Tracking-only trips have no balances
+  const perGroup = Object.fromEntries(Object.entries(myNetByGroup(user.id, totals.expenses, totals.payments)).filter(([gid]) => !groups.find((g) => g.id === gid)?.track_only));
+  const currencyOf = (gid: string) => groups.find((g) => g.id === gid)?.currency || 'INR';
+  const byCurrency = Object.entries(totalsByCurrency(perGroup, currencyOf))
+    .sort((a, b) => Number(b[0] === 'INR') - Number(a[0] === 'INR'));
+  const rows = groups
+    .map((g) => ({ g, net: perGroup[g.id] ?? 0 }))
+    .sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
+  const loading = groupsLoading || totals.loading;
 
   return (
     <div className="flex flex-col">
       <AppHeader title="Balances" />
       <div className="p-4 space-y-4">
-        {myBalance && (
-          <Card className={myBalance.net_balance > 0.01 ? 'bg-green-50 border-green-100' : myBalance.net_balance < -0.01 ? 'bg-red-50 border-red-100' : 'bg-gray-50 border-gray-100'}>
-            <p className="text-sm text-gray-600 mb-1">Your overall balance</p>
-            <p className={`text-3xl font-bold ${myBalance.net_balance > 0.01 ? 'text-green-700' : myBalance.net_balance < -0.01 ? 'text-red-600' : 'text-gray-600'}`}>
-              {myBalance.net_balance > 0.01 ? `+${formatCurrency(myBalance.net_balance)}` : myBalance.net_balance < -0.01 ? formatCurrency(myBalance.net_balance) : 'All settled up!'}
-            </p>
-            <p className="text-sm text-gray-500 mt-1">
-              {myBalance.net_balance > 0.01 ? 'You are owed across all groups' : myBalance.net_balance < -0.01 ? 'You owe across all groups' : 'No outstanding balances'}
-            </p>
-          </Card>
-        )}
-
         {loading ? (
-          <div className="space-y-3">{[1, 2].map((i) => <div key={i} className="h-32 bg-gray-100 rounded-2xl animate-pulse" />)}</div>
+          <div className="space-y-3">{[1, 2].map((i) => <div key={i} className="h-24 bg-gray-100 rounded-2xl animate-pulse" />)}</div>
         ) : groups.length === 0 ? (
           <EmptyState icon={BarChart2} title="No balances yet" description="Join a group and add expenses to see balances" />
         ) : (
           <>
-            <Card>
-              <h3 className="font-semibold text-gray-900 mb-3">All Balances</h3>
-              <BalanceList balances={allBalances} currentUserId={user.id} />
+            {byCurrency.length > 0 ? byCurrency.map(([code, t]) => (
+              <Card key={code} className={t.net > 0 ? 'bg-green-50 border-green-100' : t.net < 0 ? 'bg-red-50 border-red-100' : 'bg-gray-50 border-gray-100'}>
+                <p className="text-sm text-gray-600 mb-1">Across your {code === 'INR' && byCurrency.length === 1 ? '' : `${code} `}trips</p>
+                <p className={`text-3xl font-bold ${t.net > 0 ? 'text-green-700' : t.net < 0 ? 'text-red-600' : 'text-gray-600'}`}>
+                  {t.net === 0 ? 'All settled up' : `${t.net > 0 ? '+' : ''}${formatCurrency(t.net, code)}`}
+                </p>
+                <p className="text-sm text-gray-500 mt-1">
+                  You&apos;re owed {formatCurrency(t.owed, code)} · you owe {formatCurrency(t.owe, code)}
+                </p>
+              </Card>
+            )) : (
+              <Card className="bg-gray-50 border-gray-100"><p className="text-lg font-bold text-gray-600">All settled up</p></Card>
+            )}
+
+            <Card padding="none">
+              <h3 className="font-semibold text-gray-900 px-4 pt-4 pb-2">By trip</h3>
+              {rows.map(({ g, net }) => (
+                <button
+                  key={g.id}
+                  onClick={() => router.push(`/groups/${g.id}`)}
+                  className="w-full flex items-center gap-3 px-4 py-3 border-t border-gray-50 text-left active:bg-gray-50"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-gray-900 truncate">{g.name}</p>
+                    <p className="text-xs text-gray-500">
+                      {g.track_only ? 'just tracking spending' : net > 0 ? 'you get back' : net < 0 ? 'you owe' : 'settled up'}
+                    </p>
+                  </div>
+                  <span className={`text-sm font-bold tabular-nums ${net > 0 ? 'text-green-600' : net < 0 ? 'text-red-500' : 'text-gray-400'}`}>
+                    {net === 0 ? '—' : formatCurrency(Math.abs(net), g.currency || 'INR')}
+                  </span>
+                  <ChevronRight size={16} className="text-gray-300 shrink-0" />
+                </button>
+              ))}
             </Card>
-            <Card>
-              <h3 className="font-semibold text-gray-900 mb-3">Suggested Settlements</h3>
-              <SettlementList settlements={allSettlements} currentUserId={user.id} />
-            </Card>
+            <p className="text-xs text-gray-400 text-center">Open a trip to see who to pay and settle up.</p>
           </>
         )}
       </div>

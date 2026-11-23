@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { clearOfflineCache } from '@/components/pwa/Pwa';
 
 export default function AuthListener() {
   const router = useRouter();
@@ -14,6 +15,7 @@ export default function AuthListener() {
         router.refresh();
       }
       if (event === 'SIGNED_OUT') {
+        clearOfflineCache();
         router.push('/login');
       }
     });

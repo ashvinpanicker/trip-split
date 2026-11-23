@@ -1,8 +1,10 @@
 'use client';
 
+import PageSkeleton from '@/components/ui/PageSkeleton';
+import PayMethodsEditor from '@/components/profile/PayMethodsEditor';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { LogOut, User, Mail, Edit2, Check } from 'lucide-react';
+import { ArrowLeft, User, Mail, Edit2, Check } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import AppHeader from '@/components/layout/AppHeader';
 import Avatar from '@/components/ui/Avatar';
@@ -21,11 +23,6 @@ export default function ProfilePage() {
   const [name, setName] = useState('');
   const [saving, setSaving] = useState(false);
 
-  async function handleSignOut() {
-    await supabase.auth.signOut();
-    router.push('/login');
-  }
-
   async function handleSaveName() {
     if (!name.trim() || !user) return;
     setSaving(true);
@@ -42,12 +39,14 @@ export default function ProfilePage() {
     setSaving(false);
   }
 
-  if (loading) return null;
-  if (!user) return null;
+  if (!user) return <PageSkeleton />;
 
   return (
     <div className="flex flex-col">
-      <AppHeader title="Profile" />
+      <AppHeader
+        title="Profile"
+        left={<button onClick={() => router.back()} aria-label="Back" className="p-1 hover:bg-gray-100 rounded-lg"><ArrowLeft size={20} className="text-gray-600" /></button>}
+      />
 
       <div className="p-4 space-y-4">
         {/* Avatar + name */}
@@ -78,7 +77,7 @@ export default function ProfilePage() {
                 </button>
               </div>
             )}
-            <p className="text-gray-500 text-sm mt-1">{user.email}</p>
+            <p className="text-gray-500 text-sm mt-1 truncate">{user.email}</p>
           </div>
         </Card>
 
@@ -88,7 +87,7 @@ export default function ProfilePage() {
             <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
               <User size={16} className="text-blue-600" />
             </div>
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
               <p className="text-xs text-gray-500">Full name</p>
               <p className="text-sm font-medium text-gray-900">{user.full_name || '—'}</p>
             </div>
@@ -97,16 +96,15 @@ export default function ProfilePage() {
             <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
               <Mail size={16} className="text-blue-600" />
             </div>
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
               <p className="text-xs text-gray-500">Email</p>
-              <p className="text-sm font-medium text-gray-900">{user.email}</p>
+              <p className="text-sm font-medium text-gray-900 truncate">{user.email}</p>
             </div>
           </div>
         </Card>
 
-        <Button variant="danger" fullWidth onClick={handleSignOut}>
-          <LogOut size={16} className="mr-2" /> Sign out
-        </Button>
+        <PayMethodsEditor userId={user.id} initial={(user as any).pay_methods} legacyUpi={user.upi_id} />
+
       </div>
     </div>
   );

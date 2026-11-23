@@ -2,6 +2,8 @@
 
 import { useEffect } from 'react';
 import { X } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
+import { spring } from '@/lib/motion';
 import { cn } from '@/lib/utils/cn';
 
 interface ModalProps {
@@ -22,19 +24,27 @@ export default function Modal({ open, onClose, title, children, size = 'md' }: M
     return () => { document.body.style.overflow = ''; };
   }, [open]);
 
-  if (!open) return null;
-
   const isFullscreen = size === 'fullscreen';
 
   return (
+    <AnimatePresence>
+    {open && (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-      <div
+      <motion.div
         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
         onClick={onClose}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.15 }}
       />
-      <div
+      <motion.div
+        initial={{ y: '100%' }}
+        animate={{ y: 0 }}
+        exit={{ y: '100%' }}
+        transition={spring}
         className={cn(
-          'relative bg-white shadow-xl z-10 w-full',
+          'relative bg-white shadow-xl z-10 w-full max-w-full overflow-x-hidden',
           isFullscreen
             ? 'h-full rounded-none'
             : 'rounded-t-3xl sm:rounded-2xl max-h-[90vh] overflow-y-auto',
@@ -55,7 +65,9 @@ export default function Modal({ open, onClose, title, children, size = 'md' }: M
           </div>
         )}
         <div className={cn(!isFullscreen && 'pb-safe')}>{children}</div>
-      </div>
+      </motion.div>
     </div>
+    )}
+    </AnimatePresence>
   );
 }

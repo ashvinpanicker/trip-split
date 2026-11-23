@@ -1,0 +1,132 @@
+'use client';
+
+/**
+ * Tiny translations for the screens friends use every day. English is the fallback
+ * for anything not translated yet. Hindi is everyday Hindi with the English words people
+ * actually use for money apps (ट्रिप, UPI), the way PhonePe and GPay write it.
+ * Wording that involves money should be checked by a native speaker before adding a language.
+ */
+import { useEffect, useState } from 'react';
+
+export const LANGS = [
+  { code: 'en', label: 'English' },
+  { code: 'hi', label: 'हिन्दी' },
+] as const;
+export type Lang = (typeof LANGS)[number]['code'];
+
+const en = {
+  'nav.home': 'Home', 'nav.groups': 'Groups', 'nav.add': 'Add', 'nav.balances': 'Balances', 'nav.profile': 'Profile', 'nav.settings': 'Settings',
+  'you': 'You', 'someone': 'Someone',
+  'dash.hi': 'Hi, {name} 👋', 'dash.summary': "Here's your summary", 'dash.net': 'Net balance',
+  'dash.owed': 'You are owed', 'dash.owe': 'You owe', 'dash.groups': 'Your groups', 'dash.seeAll': 'See all',
+  'dash.recent': 'Recent activity', 'dash.empty': 'No expenses yet', 'dash.emptyHint': 'Create a group and add your first expense',
+  'exp.paid': '{date} · {name} paid', 'exp.youPaid': 'you paid', 'exp.youOwe': 'you owe {amount}',
+  'exp.edit': 'Edit', 'exp.delete': 'Delete', 'exp.confirmDelete': 'Delete this expense?', 'exp.deleted': 'Expense deleted',
+  'trip.total': 'Total spent', 'trip.myBalance': 'My balance', 'trip.myShare': 'My share', 'trip.perDay': 'Per day',
+  'trip.expenses': 'Expenses', 'trip.youPaid': 'You paid',
+  'trip.tab.expenses': 'Expenses', 'trip.tab.balances': 'Balances', 'trip.tab.stats': 'Stats',
+  'trip.people': 'People', 'trip.activity': 'Activity', 'trip.done': 'Done',
+  'trip.noExpenses': 'No expenses yet', 'trip.addFirst': 'Add your first expense', 'trip.addExpense': 'Add expense',
+  'trip.search': 'Search expenses', 'trip.noMatch': 'No expenses match.', 'trip.archived': 'This trip is archived.', 'trip.restore': 'Restore',
+  'add.title': 'Add expense', 'add.editTitle': 'Edit expense', 'add.what': 'Title', 'add.whatHint': 'e.g. Dinner at the shack',
+  'add.amount': 'Amount ({sym})', 'add.date': 'Date', 'add.category': 'Category', 'add.paidBy': 'Paid by',
+  'add.settledNow': 'Everyone already paid {name} back', 'add.settledHint': 'Counts in trip stats, but nobody owes anything for it.',
+  'exp.settled': 'settled', 'exp.paidBack': 'paid back', 'exp.markPaidBack': 'Mark paid back',
+  'add.paidIn': 'Paid in', 'add.splitEqually': 'Split equally', 'add.change': 'Change', 'add.splitType': 'Split type',
+  'add.equal': 'Equal', 'add.exact': 'Exact', 'add.items': 'Items', 'add.splitBetween': 'Split between',
+  'add.save': 'Add expense', 'add.update': 'Save changes', 'add.added': 'Expense added', 'add.updated': 'Expense updated',
+  'add.notes': 'Notes (optional)', 'add.keepRate': 'Use this rate for the whole trip (e.g. what your forex card gave you)',
+  'settle.done': 'All settled up!', 'settle.none': 'No payments needed', 'settle.markPaid': 'Mark paid', 'settle.gotIt': 'Got it', 'settle.iPaid': 'I’ve paid',
+  'settle.saving': 'Saving…', 'settle.remind': 'Remind', 'settle.payVia': 'Pay via {method}', 'settle.breakdown': 'See breakdown',
+  'settle.recorded': 'Payment recorded', 'settle.didYouPay': 'Paid {name} {amount}? Mark it here so everyone’s balance updates.', 'settle.yesPaid': 'Yes, mark paid', 'settle.notYet': 'Not yet', 'settle.confirm': 'Record that {who} paid {to} {amount}?',
+  'settle.address': '{method} address', 'settle.addMethods': 'Add UPI, PayPal, crypto and more in Profile so friends can pay you in one tap.',
+  'settle.remindText': 'Hey {name}, quick nudge from {trip}: you owe me {amount}. See it and pay in one tap here: {link}\nAfter paying, tap “I’ve paid” in the app so you’re off the list.',
+  'settings.features': 'Features', 'settings.featuresHint': 'Turn on only what you need. Trip admins get them all until they choose.',
+  'feat.splits': 'More ways to split', 'feat.splits.hint': 'Exact amounts, by item or by %.',
+  'feat.payments': 'Record payments', 'feat.payments.hint': 'Any amount, paid back on the spot, or two people paying one bill.',
+  'feat.activity': 'Activity log', 'feat.activity.hint': 'Every add, edit and delete in a trip.',
+  'feat.export': 'Download spreadsheet', 'feat.export.hint': 'A trip’s expenses as a CSV file.', 'settings.language': 'Language', 'settings.profileHint': 'Name, email and how friends pay you', 'settings.feedback': 'Send feedback', 'settings.signOut': 'Sign out', 'settings.theme': 'Theme', 'settings.theme.auto': 'Auto', 'settings.theme.light': 'Light', 'settings.theme.dark': 'Dark',
+  'link.hi': 'Hi {name}', 'link.settled': "You're all settled up 🎉", 'link.owe': 'You owe {amount}', 'link.get': 'You get back {amount}',
+  'link.share': 'Your share of {n} expenses: {amount}', 'link.pay': 'Pay {name} {amount}', 'link.paysYou': '{name} pays you {amount}',
+  'link.noMethod': "{name} hasn't added a payment method yet. Pay them however you usually do.",
+  'link.after': 'After you pay, tell the trip admin so they can mark it paid.', 'link.broken': "This link doesn't work any more",
+  'link.brokenHint': 'Ask whoever sent it for a fresh one.', 'link.join': 'Want to add expenses yourself?', 'link.signup': 'Make a free account',
+};
+type Key = keyof typeof en;
+
+const hi: Partial<Record<Key, string>> = {
+  'nav.home': 'होम', 'nav.groups': 'ग्रुप', 'nav.add': 'जोड़ें', 'nav.balances': 'हिसाब', 'nav.profile': 'प्रोफ़ाइल', 'nav.settings': 'सेटिंग्स',
+  'you': 'आप', 'someone': 'कोई',
+  'dash.hi': 'नमस्ते, {name} 👋', 'dash.summary': 'आपका हिसाब एक नज़र में', 'dash.net': 'कुल बैलेंस',
+  'dash.owed': 'आपको मिलने हैं', 'dash.owe': 'आपको देने हैं', 'dash.groups': 'आपके ग्रुप', 'dash.seeAll': 'सब देखें',
+  'dash.recent': 'हाल के खर्चे', 'dash.empty': 'अभी कोई खर्चा नहीं', 'dash.emptyHint': 'ग्रुप बनाइए और पहला खर्चा जोड़िए',
+  'exp.paid': '{date} · {name} ने दिए', 'exp.youPaid': 'आपने दिए', 'exp.youOwe': 'आपको {amount} देने हैं',
+  'exp.edit': 'बदलें', 'exp.delete': 'हटाएँ', 'exp.confirmDelete': 'यह खर्चा हटाएँ?', 'exp.deleted': 'खर्चा हटा दिया',
+  'trip.total': 'कुल खर्चा', 'trip.myBalance': 'मेरा बैलेंस', 'trip.myShare': 'मेरा हिस्सा', 'trip.perDay': 'हर दिन',
+  'trip.expenses': 'खर्चे', 'trip.youPaid': 'आपने दिए',
+  'trip.tab.expenses': 'खर्चे', 'trip.tab.balances': 'हिसाब', 'trip.tab.stats': 'आँकड़े',
+  'trip.people': 'लोग', 'trip.activity': 'गतिविधि', 'trip.done': 'हो गया',
+  'trip.noExpenses': 'अभी कोई खर्चा नहीं', 'trip.addFirst': 'पहला खर्चा जोड़िए', 'trip.addExpense': 'खर्चा जोड़ें',
+  'trip.search': 'खर्चे खोजें', 'trip.noMatch': 'कोई खर्चा नहीं मिला।', 'trip.archived': 'यह ट्रिप आर्काइव है।', 'trip.restore': 'वापस लाएँ',
+  'add.title': 'खर्चा जोड़ें', 'add.editTitle': 'खर्चा बदलें', 'add.what': 'किस चीज़ का', 'add.whatHint': 'जैसे: शैक पर डिनर',
+  'add.amount': 'रकम ({sym})', 'add.date': 'तारीख', 'add.category': 'किस तरह का', 'add.paidBy': 'किसने दिए',
+  'add.settledNow': 'सबने {name} को पैसे लौटा दिए', 'add.settledHint': 'ट्रिप के आँकड़ों में गिना जाएगा, पर किसी पर बकाया नहीं।',
+  'exp.settled': 'चुकता', 'exp.paidBack': 'लौटा दिए', 'exp.markPaidBack': 'लौटा दिए, दर्ज करें',
+  'add.paidIn': 'किस करेंसी में', 'add.splitEqually': 'सब में बराबर', 'add.change': 'बदलें', 'add.splitType': 'कैसे बाँटें',
+  'add.equal': 'बराबर', 'add.exact': 'तय रकम', 'add.items': 'आइटम से', 'add.splitBetween': 'किस-किस में बाँटें',
+  'add.save': 'खर्चा जोड़ें', 'add.update': 'बदलाव सेव करें', 'add.added': 'खर्चा जुड़ गया', 'add.updated': 'खर्चा बदल गया',
+  'add.notes': 'नोट (ज़रूरी नहीं)', 'add.keepRate': 'पूरी ट्रिप के लिए यही रेट रखें (जैसे फ़ॉरेक्स कार्ड वाला)',
+  'settle.done': 'सब हिसाब बराबर!', 'settle.none': 'किसी को कुछ नहीं देना', 'settle.markPaid': 'पेमेंट हो गया', 'settle.gotIt': 'मिल गए', 'settle.iPaid': 'मैंने दे दिए',
+  'settle.saving': 'सेव हो रहा है…', 'settle.remind': 'याद दिलाएँ', 'settle.payVia': '{method} से दें', 'settle.breakdown': 'पूरा हिसाब देखें',
+  'settle.recorded': 'पेमेंट दर्ज हो गया', 'settle.didYouPay': '{name} को {amount} दे दिए? यहाँ दर्ज कीजिए, ताकि सबका हिसाब अपडेट हो जाए।', 'settle.yesPaid': 'हाँ, दे दिए', 'settle.notYet': 'अभी नहीं', 'settle.confirm': 'दर्ज करें कि {who} ने {to} को {amount} दिए?',
+  'settle.address': '{method} पता', 'settle.addMethods': 'प्रोफ़ाइल में UPI, PayPal वगैरह जोड़िए, ताकि दोस्त एक टैप में पैसे दे सकें।',
+  'settle.remindText': 'हाय {name}, {trip} का हिसाब: आपको मुझे {amount} देने हैं। यहाँ देखिए और एक टैप में दीजिए: {link}\nपैसे देने के बाद ऐप में “मैंने दे दिए” दबाइए, ताकि आपका नाम लिस्ट से हट जाए।',
+  'settings.features': 'फ़ीचर', 'settings.featuresHint': 'जो चाहिए वही चालू करें। जब तक वो न चुनें, ट्रिप एडमिन को सब मिलते हैं।',
+  'feat.splits': 'बाँटने के और तरीके', 'feat.splits.hint': 'तय रकम, आइटम से या % से।',
+  'feat.payments': 'पेमेंट दर्ज करना', 'feat.payments.hint': 'कोई भी रकम, मौके पर लौटाए पैसे, या दो लोगों ने एक बिल भरा।',
+  'feat.activity': 'गतिविधि', 'feat.activity.hint': 'ट्रिप में हर जोड़, बदलाव और हटाना।',
+  'feat.export': 'स्प्रेडशीट डाउनलोड', 'feat.export.hint': 'ट्रिप के खर्च CSV फ़ाइल में।', 'settings.language': 'भाषा', 'settings.profileHint': 'नाम, ईमेल और दोस्त आपको पैसे कैसे दें', 'settings.feedback': 'सुझाव भेजें', 'settings.signOut': 'साइन आउट', 'settings.theme': 'थीम', 'settings.theme.auto': 'फ़ोन जैसा', 'settings.theme.light': 'लाइट', 'settings.theme.dark': 'डार्क',
+  'link.hi': 'नमस्ते {name}', 'link.settled': 'आपका सब हिसाब बराबर है 🎉', 'link.owe': 'आपको {amount} देने हैं', 'link.get': 'आपको {amount} वापस मिलने हैं',
+  'link.share': '{n} खर्चों में आपका हिस्सा: {amount}', 'link.pay': '{name} को {amount} दें', 'link.paysYou': '{name} आपको {amount} देंगे',
+  'link.noMethod': '{name} ने अभी पेमेंट का तरीका नहीं जोड़ा। जैसे हमेशा देते हैं, वैसे दे दीजिए।',
+  'link.after': 'पैसे देने के बाद ट्रिप एडमिन को बता दीजिए, ताकि वो इसे दर्ज कर दें।', 'link.broken': 'यह लिंक अब काम नहीं करता',
+  'link.brokenHint': 'जिसने भेजा है, उनसे नया लिंक माँगिए।', 'link.join': 'खुद खर्चे जोड़ना चाहते हैं?', 'link.signup': 'फ़्री अकाउंट बनाइए',
+};
+
+export const DICTS: Record<Lang, Partial<Record<Key, string>>> = { en, hi };
+const KEY = 'tripsplit:lang';
+const EVENT = 'tripsplit:lang-changed';
+
+export function getLang(): Lang {
+  try {
+    const v = localStorage.getItem(KEY);
+    if (v === 'en' || v === 'hi') return v;
+  } catch {}
+  return 'en';
+}
+
+export function setLang(lang: Lang) {
+  try { localStorage.setItem(KEY, lang); } catch {}
+  document.documentElement.lang = lang;
+  window.dispatchEvent(new Event(EVENT));
+}
+
+export function translate(lang: Lang, key: Key, vars?: Record<string, string | number>): string {
+  const s = DICTS[lang][key] ?? en[key];
+  return vars ? s.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? '')) : s;
+}
+
+/** `const t = useT(); t('dash.owe')` — re-renders when the language changes. */
+export function useT() {
+  const [lang, set] = useState<Lang>('en');
+  useEffect(() => {
+    const sync = () => { const l = getLang(); set(l); document.documentElement.lang = l; };
+    sync();
+    window.addEventListener(EVENT, sync);
+    window.addEventListener('storage', sync);
+    return () => { window.removeEventListener(EVENT, sync); window.removeEventListener('storage', sync); };
+  }, []);
+  const t = (key: Key, vars?: Record<string, string | number>) => translate(lang, key, vars);
+  t.lang = lang;
+  return t;
+}
