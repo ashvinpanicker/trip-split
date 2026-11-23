@@ -31,18 +31,19 @@ import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/components/ui/Toast';
 import { useUser } from '@/hooks/useUser';
 import { useFeatureChoice, withDefaults } from '@/hooks/useFeatures';
-import { setActiveCurrency, calculateGroupBalances, directDebts, settleModeOf, settlePlan, SETTLE_MODES, type SettleMode, formatCurrency, categoryOf } from '@/lib/utils/balance';
+import { setActiveCurrency, calculateGroupBalances, directDebts, settleModeOf, settleModeValue, settlePlan, SETTLE_MODES, type SettleMode, formatCurrency, categoryOf } from '@/lib/utils/balance';
 import type { Expense, ExpenseParticipant } from '@/types';
 import { copaysByExpense, paidBackMap } from '@/lib/utils/paidBack';
 import { motion } from 'motion/react';
 import { PendingChanges, useOutbox } from '@/components/pwa/Sync';
+import TripRecap from '@/components/groups/TripRecap';
 import EditPersonSheet, { type EditablePerson } from '@/components/groups/EditPersonSheet';
 import { memberName, tripPersons } from '@/lib/utils/people';
 import { enter, spring } from '@/lib/motion';
 
 const EMPTY = new Set<string>();
 
-type Tab = 'expenses' | 'balances' | 'stats' | 'members' | 'activity';
+type Tab = 'recap' | 'expenses' | 'balances' | 'stats' | 'members' | 'activity';
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -72,6 +73,11 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
     const t = new URLSearchParams(window.location.search).get('tab');
     if (t === 'balances' || t === 'stats') setTab(t);
   }, []);
+  // A wrapped-up trip opens on its recap (unless a link asked for a tab)
+  const wrapped = !!group?.archived_at;
+  useEffect(() => {
+    if (wrapped && !new URLSearchParams(window.location.search).get('tab')) setTab('recap');
+  }, [wrapped]);
   const [showAddExpense, setShowAddExpense] = useState(false);
   const [personId, setPersonId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
@@ -129,11 +135,12 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
   // "Just track spending": no balances or settle-up (who paid is still saved)
   const trackOnly = !!group.track_only;
   const views: { key: Tab; label: string }[] = [
+    ...(group.archived_at ? [{ key: 'recap' as Tab, label: 'Recap' }] : []),
     { key: 'expenses', label: t('trip.tab.expenses') },
     ...(trackOnly ? [] : [{ key: 'balances' as Tab, label: t('trip.tab.balances') }]),
     { key: 'stats' as Tab, label: t('trip.tab.stats') },
   ];
-  const view = (trackOnly && tab === 'balances') || (!features.activity && tab === 'activity') ? 'expenses' : tab;
+  const view = (trackOnly && tab === 'balances') || (!features.activity && tab === 'activity') || (tab === 'recap' && !group.archived_at) ? 'expenses' : tab;
   const myPaid = stats.paidUpfront.find((p) => p.id === user.id)?.total ?? 0;
   const shown = filterExpenses(expenses, { query, category: catFilter, payer: payerFilter });
 
@@ -152,14 +159,14 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
     else { toast(`Amounts now shown in ${code}`); refetchGroup(); }
   }
 
-  // Archiving only tidies the dashboard; balances still count
+  // Wrapping up turns the trip page into a recap and tidies Home; every bill and balance stays
   async function setArchived(archive: boolean) {
     if (archive && settlements.length > 0 && !trackOnly &&
-        !confirm('Some balances are still open. Archive anyway? They will still count in your totals.')) return;
+        !confirm('Some payments are still open. Wrap up anyway? They still count, and the recap shows what’s left.')) return;
     const { error } = await createClient().from('groups')
       .update({ archived_at: archive ? new Date().toISOString() : null }).eq('id', id);
     if (error) toast(error.message, 'error');
-    else { toast(archive ? 'Trip archived' : 'Trip restored'); refetchGroup(); }
+    else { toast(archive ? '🌅 Trip wrapped up' : 'Trip reopened'); setTab(archive ? 'recap' : 'expenses'); refetchGroup(); }
   }
 
   function exportCsv() {
@@ -173,13 +180,9 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
   }
 
   async function setSettleMode(mode: SettleMode) {
-    const groups = createClient().from('groups');
-    // simplify_debts kept in step for the no-sign-in page until settle_mode exists everywhere
-    let { error } = await groups.update({ settle_mode: mode, simplify_debts: mode === 'fewest' }).eq('id', id);
-    if (error && /settle_mode/.test(error.message)) {
-      if (mode === 'loops') { toast('This option needs a quick database update first', 'error'); return; }
-      ({ error } = await groups.update({ simplify_debts: mode === 'fewest' }).eq('id', id));
-    }
+    // simplify_debts kept in step for anything still reading it
+    const { error } = await createClient().from('groups')
+      .update({ settle_mode: settleModeValue(mode), simplify_debts: mode === 'smart' }).eq('id', id);
     if (error) toast(error.message, 'error');
     else { toast(`Settle up: ${SETTLE_MODES.find((m) => m.key === mode)!.label}`); refetchGroup(); }
   }
@@ -241,12 +244,7 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
           </div>
         }
       />
-      {group.archived_at && (
-        <div className="mx-4 mt-3 flex items-center justify-between gap-3 rounded-xl bg-gray-100 px-3 py-2 text-sm text-gray-600">
-          <span>{t('trip.archived')}</span>
-          {isAdmin && <button onClick={() => setArchived(false)} className="font-medium text-blue-600">{t('trip.restore')}</button>}
-        </div>
-      )}
+
 
       {/* Stats */}
       <div className="bg-white border-b border-gray-100 px-4 py-3">
@@ -286,7 +284,7 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
       {/* Main views: a compact segmented switch (hidden when there's only one) */}
       {views.length > 1 && (
       <div className="bg-white border-b border-gray-100 px-4 py-2">
-        <div role="tablist" aria-label="Trip views" className={`grid ${views.length === 3 ? 'grid-cols-3' : 'grid-cols-2'} gap-1 rounded-xl bg-gray-100 p-1`}>
+        <div role="tablist" aria-label="Trip views" className={`grid ${['', 'grid-cols-1', 'grid-cols-2', 'grid-cols-3', 'grid-cols-4'][views.length]} gap-1 rounded-xl bg-gray-100 p-1`}>
           {views.map(({ key, label }) => (
             <button
               key={key}
@@ -314,6 +312,19 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
 
       <motion.div key={view} {...enter} className="flex-1 p-4 space-y-3">
         <PendingChanges groupId={id} />
+        {view === 'recap' && (
+          <TripRecap
+            name={group.name}
+            people={allPersons.length}
+            stats={stats}
+            open={trackOnly ? [] : settlements}
+            currency={group.currency || undefined}
+            isAdmin={isAdmin}
+            onSeeBalances={() => setTab('balances')}
+            onSeeExpenses={() => setTab('expenses')}
+            onReopen={() => setArchived(false)}
+          />
+        )}
         {/* Expenses tab */}
         {view === 'expenses' && (
           expLoading ? (
@@ -399,7 +410,6 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
             <SettleUpPanel
               balances={balances}
               plan={settlements}
-              byPerson={directPlan}
               mode={settleMode}
               canRecord={features.payments}
               isAdmin={isAdmin}
@@ -462,7 +472,7 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
                         <label key={m.key} className={`flex gap-3 rounded-xl border px-3 py-2.5 cursor-pointer ${settleMode === m.key ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}>
                           <input type="radio" name="settle-mode" checked={settleMode === m.key} onChange={() => setSettleMode(m.key)} className="mt-1 accent-blue-600" />
                           <span className="min-w-0">
-                            <span className="block text-sm font-medium text-gray-900">{m.label}{m.key === 'loops' && <span className="ml-1.5 text-xs font-normal text-blue-700">recommended</span>}</span>
+                            <span className="block text-sm font-medium text-gray-900">{m.label}{m.key === 'smart' && <span className="ml-1.5 text-xs font-normal text-blue-700">recommended</span>}</span>
                             <span className="block text-xs text-gray-500">{m.hint}</span>
                           </span>
                         </label>
@@ -474,9 +484,9 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
                   onClick={() => setArchived(!group.archived_at)}
                   className="mt-4 w-full rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
                 >
-                  {group.archived_at ? 'Restore trip' : 'Archive trip'}
+                  {group.archived_at ? 'Reopen trip' : '🌅 Wrap up trip'}
                 </button>
-                {!group.archived_at && <p className="text-xs text-gray-500 mt-2">Trip over? Archiving hides it from your home screen. Nothing is deleted.</p>}
+                {!group.archived_at && <p className="text-xs text-gray-500 mt-2">Trip over and settled? Wrapping up gives everyone a recap to share and tidies Home. Every bill stays.</p>}
               </Card>
             )}
             <AddPeopleCard

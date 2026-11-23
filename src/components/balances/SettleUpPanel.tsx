@@ -15,8 +15,6 @@ import type { Balance, Settlement } from '@/types';
 
 interface SettleUpPanelProps {
   balances: Balance[];
-  /** Who genuinely owes whom (netted per pair), to mark payments that go to someone else */
-  byPerson: Settlement[];
   /** The plan for this trip's settle-up mode (settlePlan) */
   plan: Settlement[];
   /** Group setting, changed by admins in Group settings */
@@ -33,13 +31,27 @@ interface SettleUpPanelProps {
 }
 
 export default function SettleUpPanel({
-  balances, byPerson, plan, mode, isAdmin, canRecord, onOpenPerson,
+  balances, plan, mode, isAdmin, canRecord, onOpenPerson,
   currentUserId, groupId, groupName, payMethods, onRecorded,
 }: SettleUpPanelProps) {
   const [showAll, setShowAll] = useState(false);
 
   const modeInfo = SETTLE_MODES.find((m) => m.key === mode)!;
-  const realPairs = useMemo(() => new Set(byPerson.map((s) => `${s.from_id}>${s.to_id}`)), [byPerson]);
+  // Fewest payments: each payment explains itself from overall balances, so nobody has to re-check it
+  const net = useMemo(() => new Map(balances.map((b) => [b.person_id, b.net_balance])), [balances]);
+  const first = (n: string) => n.split(' ')[0];
+  const why = (s: Settlement) => {
+    if (mode !== 'smart') return null;
+    const short = -(net.get(s.from_id) ?? 0), ahead = net.get(s.to_id) ?? 0;
+    if (s.from_id === currentUserId) {
+      return `You’re ${formatCurrency(short)} short overall. ${first(s.to_name)} paid ${formatCurrency(ahead)} more than their share${
+        Math.round(s.amount * 100) === Math.round(short * 100) ? ', so this squares you both up.' : '.'}`;
+    }
+    if (s.to_id === currentUserId) {
+      return `${first(s.from_name)} is ${formatCurrency(short)} short overall; you paid ${formatCurrency(ahead)} more than your share.`;
+    }
+    return null;
+  };
   const mine = (s: Settlement) => s.from_id === currentUserId || s.to_id === currentUserId;
   // Your payments first, then biggest amounts
   const sorted = useMemo(
@@ -112,8 +124,8 @@ export default function SettleUpPanel({
           groupName={groupName}
           payMethods={payMethods}
           onRecorded={onRecorded}
-          onOpenPerson={onOpenPerson}
-          isRerouted={mode === 'fewest' ? (s) => !realPairs.has(`${s.from_id}>${s.to_id}`) : undefined}
+          onOpenPerson={mode === 'direct' ? onOpenPerson : undefined}
+          why={why}
         />
 
         {plan.length > 0 && (

@@ -37,7 +37,7 @@ export default function GroupsPage() {
           {group.name[0].toUpperCase()}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-gray-900 truncate">{group.name}</p>
+          <p className="font-semibold text-gray-900 truncate">{group.name}{group.archived_at && <span className="ml-1" aria-label="wrapped up">🌅</span>}</p>
           {group.description && (
             <p className="text-xs text-gray-500 truncate">{group.description}</p>
           )}
@@ -97,9 +97,9 @@ export default function GroupsPage() {
             {archived.length > 0 && (
               <>
                 <button onClick={() => setShowArchived((v) => !v)} className="w-full text-sm text-gray-500 py-2">
-                  {showArchived ? 'Hide' : 'Show'} archived trips ({archived.length})
+                  {showArchived ? 'Hide' : 'Show'} wrapped-up trips ({archived.length})
                 </button>
-                {showArchived && <div className="space-y-3 opacity-70">{archived.map(renderGroup)}</div>}
+                {showArchived && <div className="space-y-3">{archived.map(renderGroup)}</div>}
               </>
             )}
           </div>

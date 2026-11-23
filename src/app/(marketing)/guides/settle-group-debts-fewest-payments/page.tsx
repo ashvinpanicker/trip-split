@@ -14,7 +14,7 @@ const faq: Faq[] = [
   },
   {
     q: 'Is simplifying debts fair?',
-    a: 'Everyone pays or receives exactly the same total either way; only the routing changes. The catch is that you might pay someone you didn’t owe directly, which can feel odd. That’s why TripSplit’s default only pays people who covered you, and marks rerouted payments if the admin picks the fewest payments.',
+    a: 'Everyone pays or receives exactly the same total either way; only the routing changes. The catch is that you might pay someone you didn’t owe directly, which can feel odd. That’s why every TripSplit payment explains itself from each person’s overall total, so nobody has to re-check the maths.',
   },
   {
     q: 'How does TripSplit find the minimum?',
@@ -73,7 +73,7 @@ export default function Page() {
         <li><strong>Simplify</strong> for big groups and long trips, where the saving in transfers is large.</li>
       </ul>
       <p>
-        TripSplit’s default has everyone pay back only people who covered them, with circular debts cancelled out, and shows a breakdown for every payment. The group admin can switch to the fewest payments, or to exactly by person.
+        TripSplit uses the fewest payments by default, and each payment says why (“you’re ₹2,000 short overall, Rahul paid ₹12,000 more than his share”). The group admin can switch to paying back each person instead.
         Either way, each payment opens your payment app with the amount filled in.
       </p>
     </ArticleShell>

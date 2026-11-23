@@ -55,12 +55,19 @@ export default function Page() {
         that bill, the expense shows ✓ paid back, and the plan for everyone else recalculates around it.
       </p>
 
-      <h2>Pay back the people who paid for you</h2>
+      <h2>Fewest payments that explain themselves</h2>
       <p>
-        The <Link href="/guides/settle-group-debts-fewest-payments">fewest payments</Link> sounds best on paper, but our friends kept
-        asking why they owed someone who never paid for them. So by default, everyone only pays people who actually covered them,
-        and debts that go round in a circle (you owe Rahul, Rahul owes Priya, Priya owes you) cancel out, so there are still fewer
-        payments. Trip admins can pick “exactly by person” or “fewest payments” instead, in Group settings.
+        The <Link href="/guides/settle-group-debts-fewest-payments">fewest payments</Link> is the fastest way to settle, but
+        friends kept asking why they owed someone who never paid for them. So every payment now says why: “You’re ₹2,000 short
+        overall. Rahul paid ₹12,000 more than his share, so this squares you both up.” Most people make one payment. Trip admins
+        can switch to paying back each person instead, in Group settings.
+      </p>
+
+      <h2>Wrap up the trip</h2>
+      <p>
+        Once everyone’s settled, an admin taps <strong>Wrap up trip</strong>. The trip opens on a recap: dates, total, where the
+        money went, the biggest bill and the awards. One tap shares it to WhatsApp for the friends who never joined. Every bill is
+        still there.
       </p>
 
       <h2>Simple for most people, powerful for the organiser</h2>

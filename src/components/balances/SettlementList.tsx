@@ -23,12 +23,12 @@ interface SettlementListProps {
   onRecorded?: () => void;
   /** Open "You & X" for the other person on rows that involve you */
   onOpenPerson?: (personId: string) => void;
-  /** Rows that aren't a real "who owes whom" debt (only possible when payments are simplified) */
-  isRerouted?: (s: Settlement) => boolean;
+  /** One line explaining a payment (fewest-payments plans) */
+  why?: (s: Settlement) => string | null;
 }
 
 export default function SettlementList({
-  settlements, currentUserId, groupId, groupName, payMethods = {}, onRecorded, onOpenPerson, isRerouted,
+  settlements, currentUserId, groupId, groupName, payMethods = {}, onRecorded, onOpenPerson, why,
 }: SettlementListProps) {
   const { toast } = useToast();
   const t = useT();
@@ -139,9 +139,9 @@ export default function SettlementList({
               </div>
             </div>
 
-            {(isRerouted?.(s) || (onOpenPerson && (isYouPaying || isYouReceiving))) && (
-              <div className="flex items-center justify-between gap-2 mt-1.5 text-xs">
-                <span className="text-gray-500">{isRerouted?.(s) ? 'Simplified: covers debts between others' : ''}</span>
+            {(why?.(s) || (onOpenPerson && (isYouPaying || isYouReceiving))) && (
+              <div className="flex items-start justify-between gap-2 mt-1.5 text-xs">
+                <span className="text-gray-600">{why?.(s)}</span>
                 {onOpenPerson && (isYouPaying || isYouReceiving) && (
                   <button
                     onClick={() => onOpenPerson(isYouPaying ? s.to_id : s.from_id)}
