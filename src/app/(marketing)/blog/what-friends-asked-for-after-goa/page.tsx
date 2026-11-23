@@ -55,12 +55,12 @@ export default function Page() {
         that bill, the expense shows ✓ paid back, and the plan for everyone else recalculates around it.
       </p>
 
-      <h2>Fewest payments, by default</h2>
+      <h2>Pay back the people who paid for you</h2>
       <p>
-        New trips now start with <Link href="/guides/settle-group-debts-fewest-payments">simplified payments</Link>: the fewest
-        transfers for everyone to be square. Ten friends need nine payments at most. Trip admins can switch to “pay back by person”
-        if the group prefers paying exactly who paid for them. Because direct paybacks are recorded, the two ways never conflict:
-        the plan always starts from what’s still owed.
+        The <Link href="/guides/settle-group-debts-fewest-payments">fewest payments</Link> sounds best on paper, but our friends kept
+        asking why they owed someone who never paid for them. So by default, everyone only pays people who actually covered them,
+        and debts that go round in a circle (you owe Rahul, Rahul owes Priya, Priya owes you) cancel out, so there are still fewer
+        payments. Trip admins can pick “exactly by person” or “fewest payments” instead, in Group settings.
       </p>
 
       <h2>Simple for most people, powerful for the organiser</h2>

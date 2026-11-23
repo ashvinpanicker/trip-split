@@ -272,6 +272,62 @@ export function directDebts(
   return out.sort((x, y) => y.amount - x.amount);
 }
 
+/**
+ * A owes B, B owes C, C owes A: take the smallest amount off every step of the loop.
+ * Everyone still only pays people who paid for them, balances don't change, and there are fewer payments.
+ */
+export function withoutLoops(direct: Settlement[]): Settlement[] {
+  const edges = new Map<string, Map<string, number>>(); // edges[a][b] = paise a pays b
+  for (const s of direct) (edges.get(s.from_id) ?? edges.set(s.from_id, new Map()).get(s.from_id)!).set(s.to_id, toPaise(s.amount));
+  const findLoop = (): string[] | null => {
+    const state = new Map<string, 1 | 2>(); // 1 = on the current path, 2 = done
+    const path: string[] = [];
+    const visit = (a: string): string[] | null => {
+      state.set(a, 1);
+      path.push(a);
+      for (const b of edges.get(a)?.keys() ?? []) {
+        if (state.get(b) === 1) return path.slice(path.indexOf(b));
+        if (!state.has(b)) { const loop = visit(b); if (loop) return loop; }
+      }
+      state.set(a, 2);
+      path.pop();
+      return null;
+    };
+    for (const a of edges.keys()) if (!state.has(a)) { const loop = visit(a); if (loop) return loop; }
+    return null;
+  };
+  // Each pass removes at least one payment, so this always finishes
+  for (let loop = findLoop(); loop; loop = findLoop()) {
+    const steps = loop.map((a, i) => [a, loop[(i + 1) % loop.length]] as const);
+    const least = Math.min(...steps.map(([a, b]) => edges.get(a)!.get(b)!));
+    for (const [a, b] of steps) {
+      const left = edges.get(a)!.get(b)! - least;
+      if (left) edges.get(a)!.set(b, left); else edges.get(a)!.delete(b);
+    }
+  }
+  return direct
+    .filter((s) => edges.get(s.from_id)?.has(s.to_id))
+    .map((s) => ({ ...s, amount: edges.get(s.from_id)!.get(s.to_id)! / 100 }))
+    .sort((x, y) => y.amount - x.amount);
+}
+
+/** How a trip settles up. Admins pick one in Group settings. */
+export type SettleMode = 'direct' | 'loops' | 'fewest';
+export const SETTLE_MODES: { key: SettleMode; label: string; hint: string }[] = [
+  { key: 'loops', label: 'Pay back who paid for you', hint: 'Everyone only pays people who covered them. Debts that go round in a circle cancel out, so there are fewer payments.' },
+  { key: 'direct', label: 'Exactly by person', hint: 'Pay back every person exactly what you owe them. Easiest to check, but the most payments.' },
+  { key: 'fewest', label: 'Fewest payments', hint: 'The least transfers for everyone to be square. Some people pay someone who didn’t pay for them.' },
+];
+/** Older trips only have simplify_debts. */
+export const settleModeOf = (g: { settle_mode?: string | null; simplify_debts?: boolean | null }): SettleMode =>
+  g.settle_mode === 'direct' || g.settle_mode === 'loops' || g.settle_mode === 'fewest' ? g.settle_mode : g.simplify_debts ? 'fewest' : 'direct';
+
+/** The plan everyone sees, for the trip's settle-up mode. `direct` is directDebts(...). */
+export function settlePlan(mode: SettleMode, balances: Balance[], direct: Settlement[]): Settlement[] {
+  if (mode === 'fewest') return smartSettle(balances, direct);
+  return mode === 'loops' ? withoutLoops(direct) : direct;
+}
+
 /** Equal split in whole paise; leftover paise go one each to the first people in the list. Always sums to the total. */
 export function calculateEqualSplits(totalAmount: number, keys: string[]): Record<string, number> {
   const n = keys.length;

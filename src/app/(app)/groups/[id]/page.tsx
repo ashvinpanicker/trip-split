@@ -31,7 +31,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/components/ui/Toast';
 import { useUser } from '@/hooks/useUser';
 import { useFeatureChoice, withDefaults } from '@/hooks/useFeatures';
-import { setActiveCurrency, calculateGroupBalances, smartSettle, directDebts, formatCurrency, categoryOf } from '@/lib/utils/balance';
+import { setActiveCurrency, calculateGroupBalances, directDebts, settleModeOf, settlePlan, SETTLE_MODES, type SettleMode, formatCurrency, categoryOf } from '@/lib/utils/balance';
 import type { Expense, ExpenseParticipant } from '@/types';
 import { copaysByExpense, paidBackMap } from '@/lib/utils/paidBack';
 import { motion } from 'motion/react';
@@ -118,11 +118,11 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
   const expensesWithParts = expenses.filter((e) => e.participants) as (Expense & { participants: ExpenseParticipant[] })[];
   const balances = calculateGroupBalances(expensesWithParts, allPersons, counted);
   const directPlan = directDebts(expensesWithParts, allPersons, counted);
-  const settlements = smartSettle(balances, directPlan);
+  const settleMode = settleModeOf(group);
+  const settlements = settlePlan(settleMode, balances, directPlan);
   const myRole = (group.members || []).find((m: any) => m.user_id === user.id)?.role;
   const isAdmin = myRole === 'admin';
   const features = withDefaults(featureChoice, isAdmin);
-  const simplify = !!group.simplify_debts;
   const adminCount = (group.members || []).filter((m: any) => m.role === 'admin').length;
 
   const stats = tripStats(expensesWithParts, allPersons);
@@ -172,10 +172,16 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
     URL.revokeObjectURL(url);
   }
 
-  async function toggleSimplify(next: boolean) {
-    const { error } = await createClient().from('groups').update({ simplify_debts: next }).eq('id', id);
+  async function setSettleMode(mode: SettleMode) {
+    const groups = createClient().from('groups');
+    // simplify_debts kept in step for the no-sign-in page until settle_mode exists everywhere
+    let { error } = await groups.update({ settle_mode: mode, simplify_debts: mode === 'fewest' }).eq('id', id);
+    if (error && /settle_mode/.test(error.message)) {
+      if (mode === 'loops') { toast('This option needs a quick database update first', 'error'); return; }
+      ({ error } = await groups.update({ simplify_debts: mode === 'fewest' }).eq('id', id));
+    }
     if (error) toast(error.message, 'error');
-    else { toast(next ? 'Payments simplified for everyone' : 'Back to paying by person'); refetchGroup(); }
+    else { toast(`Settle up: ${SETTLE_MODES.find((m) => m.key === mode)!.label}`); refetchGroup(); }
   }
 
   async function setRole(userId: string, role: 'admin' | 'member') {
@@ -392,12 +398,11 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
           <div className="space-y-4">
             <SettleUpPanel
               balances={balances}
-              simplified={settlements}
+              plan={settlements}
               byPerson={directPlan}
-              simplify={simplify}
+              mode={settleMode}
               canRecord={features.payments}
               isAdmin={isAdmin}
-              onToggleSimplify={toggleSimplify}
               onOpenPerson={setPersonId}
               currentUserId={user.id}
               groupId={id}
@@ -449,9 +454,22 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
                   onTrackOnly={(v) => v !== trackOnly && setGroupType({ track_only: v })}
                 />
                 <div className="mt-4"><CurrencySelect id="group-currency" value={group.currency || 'INR'} onChange={setCurrency} /></div>
-                <p className="text-xs text-gray-500 mt-3">
-                  Admins can also make others admin below, and turn on simplified payments in Balances.
-                </p>
+                {!trackOnly && (
+                  <fieldset className="mt-4">
+                    <legend className="text-sm font-medium text-gray-900 mb-2">How to settle up</legend>
+                    <div className="space-y-2">
+                      {SETTLE_MODES.map((m) => (
+                        <label key={m.key} className={`flex gap-3 rounded-xl border px-3 py-2.5 cursor-pointer ${settleMode === m.key ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}>
+                          <input type="radio" name="settle-mode" checked={settleMode === m.key} onChange={() => setSettleMode(m.key)} className="mt-1 accent-blue-600" />
+                          <span className="min-w-0">
+                            <span className="block text-sm font-medium text-gray-900">{m.label}{m.key === 'loops' && <span className="ml-1.5 text-xs font-normal text-blue-700">recommended</span>}</span>
+                            <span className="block text-xs text-gray-500">{m.hint}</span>
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
+                )}
                 <button
                   onClick={() => setArchived(!group.archived_at)}
                   className="mt-4 w-full rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
@@ -562,6 +580,8 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
         other={personId ? allPersons.find((p) => p.id === personId) ?? null : null}
         expenses={expensesWithParts}
         payments={payments}
+        planned={personId ? settlements.reduce((t, s) =>
+          t + (s.from_id === personId && s.to_id === user.id ? s.amount : 0) - (s.from_id === user.id && s.to_id === personId ? s.amount : 0), 0) : undefined}
       />
 
       <AddExpenseModal

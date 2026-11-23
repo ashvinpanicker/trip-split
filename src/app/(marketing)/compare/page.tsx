@@ -23,6 +23,7 @@ const ROWS: [string, ...string[]][] = [
   ['Spreadsheet export', '✓', '—', '✓', 'Via support', 'Paid'],
   ['Trip admins and an activity log', '✓', 'No admins: anyone can edit or delete', 'Read-only access', '—', '—'],
   ['Fewest payments to settle', '✓', '✓', '✓', '✓', '✓'],
+  ['Choose how to settle', '✓ pay back who paid for you, exactly by person, or fewest', 'Simplify on or off', '—', '—', '—'],
   ['Open source', '✓ MIT licence', 'No', 'No', 'No', 'No'],
   ['App store app', 'No: a web app you add to your home screen', '✓', '✓', '✓', '✓'],
   ['Recurring bills (rent)', 'Not yet', '✓', 'Premium', '—', '—'],

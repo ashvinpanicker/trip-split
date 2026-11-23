@@ -5,7 +5,7 @@ import { use } from 'react';
 import Statement from '@/components/balances/Statement';
 import { useGroup } from '@/hooks/useGroups';
 import { useExpenses, useSettlements } from '@/hooks/useExpenses';
-import { calculateGroupBalances, directDebts, smartSettle, setActiveCurrency, type BalancePerson } from '@/lib/utils/balance';
+import { calculateGroupBalances, directDebts, settleModeOf, settlePlan, setActiveCurrency, type BalancePerson } from '@/lib/utils/balance';
 import type { Expense, ExpenseParticipant } from '@/types';
 import { readPayMethods, type PayMethod } from '@/lib/utils/payMethods';
 import { useUser } from '@/hooks/useUser';
@@ -27,7 +27,7 @@ export default function StatementPage({ params }: { params: Promise<{ id: string
   const exps = expenses.filter((e) => e.participants) as (Expense & { participants: ExpenseParticipant[] })[];
   const balances = calculateGroupBalances(exps, persons, payments);
   const direct = directDebts(exps, persons, payments);
-  const plan = group.simplify_debts ? smartSettle(balances, direct) : direct;
+  const plan = settlePlan(settleModeOf(group), balances, direct);
 
   const payMethods: Record<string, PayMethod[]> = {};
   for (const m of group.members || []) payMethods[m.user_id] = readPayMethods((m.profile as any)?.pay_methods, (m.profile as any)?.upi_id);

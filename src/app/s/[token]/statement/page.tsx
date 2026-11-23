@@ -4,7 +4,7 @@ import { use, useEffect, useState } from 'react';
 import Statement from '@/components/balances/Statement';
 import { createClient } from '@/lib/supabase/client';
 import { readPayMethods, type PayMethod } from '@/lib/utils/payMethods';
-import { calculateGroupBalances, directDebts, smartSettle, setActiveCurrency, type BalancePerson } from '@/lib/utils/balance';
+import { calculateGroupBalances, directDebts, settleModeOf, settlePlan, setActiveCurrency, type BalancePerson } from '@/lib/utils/balance';
 
 /** The same statement, for friends with a balance link (no sign-in). */
 export default function LinkStatementPage({ params }: { params: Promise<{ token: string }> }) {
@@ -28,7 +28,7 @@ export default function LinkStatementPage({ params }: { params: Promise<{ token:
   const expenses = data.expenses.map((e: any) => ({ ...e, participants: e.participants ?? [] }));
   const balances = calculateGroupBalances(expenses, persons, data.settlements);
   const direct = directDebts(expenses, persons, data.settlements);
-  const plan = data.group.simplify_debts ? smartSettle(balances, direct) : direct;
+  const plan = settlePlan(settleModeOf(data.group), balances, direct);
 
   const payMethods: Record<string, PayMethod[]> = {};
   for (const m of data.members) payMethods[m.id] = readPayMethods(m.pay_methods, m.upi_id);

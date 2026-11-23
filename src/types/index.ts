@@ -31,6 +31,8 @@ export interface Group {
   created_by: string | null;
   invite_code: string;
   simplify_debts?: boolean;
+  /** loops | direct | fewest (see SETTLE_MODES) */
+  settle_mode?: string | null;
   currency?: string;
   kind?: string;
   track_only?: boolean;

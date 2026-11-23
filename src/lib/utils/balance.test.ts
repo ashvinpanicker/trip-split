@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  withoutLoops,
   calculateEqualSplits,
   calculatePercentageSplits,
   calculateGroupBalances,
@@ -487,5 +488,52 @@ describe('weighted equal split', () => {
     expect(s).toEqual({ couple: 500, a: 250, b: 250 });
     const odd = computeShares('equal', 100, [{ key: 'x', weight: 2 }, { key: 'y' }, { key: 'z' }, { key: 'w' }]);
     expect(Object.values(odd).reduce((t, v) => t + Math.round(v * 100), 0)).toBe(10000);
+  });
+});
+
+describe('pay back who paid for you (loops cancelled)', () => {
+  const persons = ['a', 'b', 'c'].map((id) => ({ id, name: id }));
+  const paid = (payer: string, ower: string, amt: number) => ({ paid_by: payer, paid_by_pending: null, participants: [{ user_id: ower, pending_member_id: null, share_amount: amt }] });
+
+  it('a loop of equal debts means nobody pays', () => {
+    expect(withoutLoops(directDebts([paid('b', 'a', 100), paid('c', 'b', 100), paid('a', 'c', 100)], persons))).toEqual([]);
+  });
+
+  it('keeps only real debts, with the loop taken out', () => {
+    // a owes b 300, b owes c 100, c owes a 100 → a pays b 200
+    const plan = withoutLoops(directDebts([paid('b', 'a', 300), paid('c', 'b', 100), paid('a', 'c', 100)], persons));
+    expect(plan.map((s) => [s.from_id, s.to_id, s.amount])).toEqual([['a', 'b', 200]]);
+  });
+
+  it('never changes anyone’s balance', () => {
+    const exps = [paid('b', 'a', 300), paid('c', 'b', 120), paid('a', 'c', 50), paid('c', 'a', 40)];
+    const net = (plan: { from_id: string; to_id: string; amount: number }[], id: string) =>
+      Math.round(plan.reduce((t, s) => t + (s.to_id === id ? s.amount : 0) - (s.from_id === id ? s.amount : 0), 0) * 100);
+    const plan = withoutLoops(directDebts(exps, persons));
+    const bal = calculateGroupBalances(exps, persons);
+    for (const b of bal) expect(net(plan, b.person_id)).toBe(Math.round(b.net_balance * 100));
+  });
+});
+
+describe('withoutLoops on random trips', () => {
+  it('keeps balances, only real pairs, and never more payments', () => {
+    const ids = ['a', 'b', 'c', 'd', 'e', 'f'];
+    const persons = ids.map((id) => ({ id, name: id }));
+    let seed = 7;
+    const rnd = (n: number) => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed % n; };
+    for (let t = 0; t < 300; t++) {
+      const exps = Array.from({ length: 1 + rnd(12) }, () => {
+        const payer = ids[rnd(6)];
+        const who = ids.filter(() => rnd(2));
+        return { paid_by: payer, paid_by_pending: null, participants: (who.length ? who : [ids[rnd(6)]]).map((id) => ({ user_id: id, pending_member_id: null, share_amount: 1 + rnd(5000) / 10 })) };
+      });
+      const direct = directDebts(exps, persons);
+      const plan = withoutLoops(direct);
+      expect(plan.length).toBeLessThanOrEqual(direct.length);
+      const pairs = new Set(direct.map((s) => `${s.from_id}>${s.to_id}`));
+      for (const s of plan) { expect(pairs.has(`${s.from_id}>${s.to_id}`)).toBe(true); expect(s.amount).toBeGreaterThan(0); }
+      const net = (p: typeof plan, id: string) => p.reduce((x, s) => x + (s.to_id === id ? toPaise(s.amount) : 0) - (s.from_id === id ? toPaise(s.amount) : 0), 0);
+      for (const id of ids) expect(net(plan, id)).toBe(net(direct, id));
+    }
   });
 });

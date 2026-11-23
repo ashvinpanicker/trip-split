@@ -1,4 +1,4 @@
--- Trip admin tools: edit a person (name or nickname, and who they pay for). Safe to run twice.
+-- Trip admin tools: how the trip settles up, and editing a person (name or nickname, who they pay for). Safe to run twice.
 -- Run before balance_links.sql (its no-sign-in page shows nicknames).
 
 -- Nickname: what the trip calls someone who has joined ("Jose" for "Joseph Jose"). Their own name stays theirs.
@@ -25,3 +25,12 @@ end;
 $$;
 grant execute on function public.update_person(uuid, uuid, text, int) to authenticated;
 
+
+-- How the trip settles up (Group settings):
+--   loops  = pay back who paid for you, with circular debts cancelled (default)
+--   direct = exactly by person
+--   fewest = fewest payments (may pay someone who didn't pay for you)
+alter table public.groups add column if not exists settle_mode text not null default 'loops'
+  check (settle_mode in ('loops', 'direct', 'fewest'));
+-- Trips that had "Simplify" on keep fewest payments; the rest move to the new default
+update public.groups set settle_mode = 'fewest' where simplify_debts and settle_mode = 'loops';

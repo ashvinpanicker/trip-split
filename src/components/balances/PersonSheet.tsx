@@ -13,10 +13,12 @@ interface PersonSheetProps {
   other: { id: string; name: string; avatar_url?: string | null } | null;
   expenses: (Expense & { participants: ExpenseParticipant[] })[];
   payments: SettlementRecord[];
+  /** What the settle-up plan says between you two (+ they pay you, − you pay them), when it differs */
+  planned?: number;
 }
 
 /** "You & Rahul": every expense and payment between two people, adding up to one number. */
-export default function PersonSheet({ open, onClose, me, other, expenses, payments }: PersonSheetProps) {
+export default function PersonSheet({ open, onClose, me, other, expenses, payments, planned }: PersonSheetProps) {
   if (!other) return null;
   const { items, net } = pairBreakdown(me, other.id, expenses, payments);
   const first = other.name.split(' ')[0];
@@ -59,6 +61,14 @@ export default function PersonSheet({ open, onClose, me, other, expenses, paymen
               {net > 0 ? '+' : net < 0 ? '−' : ''}{formatCurrency(Math.abs(net))}
             </span>
           </div>
+        )}
+        {planned !== undefined && Math.round(planned * 100) !== Math.round(net * 100) && (
+          <p className="rounded-xl bg-blue-50 px-3 py-2 text-sm text-blue-800">
+            {planned === 0
+              ? `In the settle-up plan you’re square with ${first}: `
+              : planned > 0 ? `In the settle-up plan ${first} pays you ${formatCurrency(planned)}: ` : `In the settle-up plan you pay ${first} ${formatCurrency(-planned)}: `}
+            the rest cancels out with what others in the trip owe each other.
+          </p>
         )}
         <p className="text-xs text-gray-400">
           + means {first} owes you for it, − means you owe {first}.

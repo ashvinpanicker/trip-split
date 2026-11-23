@@ -10,20 +10,20 @@ import Card from '@/components/ui/Card';
 import BalanceList from './BalanceList';
 import SettlementList from './SettlementList';
 import { formatCurrency, getActiveCurrency } from '@/lib/utils/balance';
+import { SETTLE_MODES, type SettleMode } from '@/lib/utils/balance';
 import type { Balance, Settlement } from '@/types';
 
 interface SettleUpPanelProps {
   balances: Balance[];
-  /** Everyone pays back exactly who paid for them (netted per pair) */
+  /** Who genuinely owes whom (netted per pair), to mark payments that go to someone else */
   byPerson: Settlement[];
-  /** Fewest payments, preferring real debts */
-  simplified: Settlement[];
-  /** Group setting, changed by admins only */
-  simplify: boolean;
+  /** The plan for this trip's settle-up mode (settlePlan) */
+  plan: Settlement[];
+  /** Group setting, changed by admins in Group settings */
+  mode: SettleMode;
   isAdmin: boolean;
   /** "Record payments" feature: manual payments of any amount */
   canRecord: boolean;
-  onToggleSimplify: (next: boolean) => void;
   onOpenPerson: (personId: string) => void;
   currentUserId: string;
   groupId: string;
@@ -33,12 +33,12 @@ interface SettleUpPanelProps {
 }
 
 export default function SettleUpPanel({
-  balances, byPerson, simplified, simplify, isAdmin, canRecord, onToggleSimplify, onOpenPerson,
+  balances, byPerson, plan, mode, isAdmin, canRecord, onOpenPerson,
   currentUserId, groupId, groupName, payMethods, onRecorded,
 }: SettleUpPanelProps) {
   const [showAll, setShowAll] = useState(false);
 
-  const plan = simplify ? simplified : byPerson;
+  const modeInfo = SETTLE_MODES.find((m) => m.key === mode)!;
   const realPairs = useMemo(() => new Set(byPerson.map((s) => `${s.from_id}>${s.to_id}`)), [byPerson]);
   const mine = (s: Settlement) => s.from_id === currentUserId || s.to_id === currentUserId;
   // Your payments first, then biggest amounts
@@ -51,7 +51,6 @@ export default function SettleUpPanel({
   const me = balances.find((b) => b.person_id === currentUserId)?.net_balance ?? 0;
   const iOwe = plan.filter((s) => s.from_id === currentUserId);
   const owedToMe = plan.filter((s) => s.to_id === currentUserId);
-  const saved = byPerson.length - simplified.length;
 
   // UPI ID next to each payee, so people can pay straight from the WhatsApp message
   const upiOf = (id: string) => payMethods?.[id]?.find((m) => m.type === 'upi')?.value;
@@ -93,45 +92,12 @@ export default function SettleUpPanel({
       </div>
 
       <div className="p-4 space-y-3">
-        {/* How payments are worked out */}
-        {(canRecord || isAdmin) && (byPerson.length > 0 || simplified.length > 0) && (
+        {/* How payments are worked out (changed by admins in Group settings) */}
+        {(canRecord || isAdmin) && plan.length > 0 && (
           <div className="rounded-xl bg-gray-50 px-3 py-2.5">
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-gray-900">{simplify ? 'Simplified payments' : 'Pay back by person'}</p>
-                <p className="text-xs text-gray-500">
-                  {simplify
-                    ? (saved > 0
-                        ? `${simplified.length} payments instead of ${byPerson.length}. Some people pay someone other than who they owe.`
-                        : 'The fewest payments for everyone to be square.')
-                    : 'Everyone pays back exactly who paid for them.'}
-                </p>
-              </div>
-              {isAdmin && (
-                <button
-                  role="switch"
-                  aria-checked={simplify}
-                  aria-label="Simplify payments"
-                  onClick={() => onToggleSimplify(!simplify)}
-                  className={`relative shrink-0 w-11 h-6 rounded-full transition-colors ${simplify ? 'bg-blue-600' : 'bg-gray-300'}`}
-                >
-                  <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${simplify ? 'translate-x-5' : ''}`} />
-                </button>
-              )}
-            </div>
-            {simplify && (
-              <p className="text-xs text-gray-500 mt-1.5">
-                Already paid someone back directly, like for a big dinner? Tap <span className="font-medium">Mark paid back</span> on that
-                expense. The plan updates around it.
-              </p>
-            )}
-            {!simplify && saved > 0 && (
-              <p className="text-xs text-blue-700 mt-1.5">
-                {isAdmin
-                  ? `Turn on Simplify to cut this to ${simplified.length} payments.`
-                  : `Your group admin can simplify this to ${simplified.length} payments for the final settle-up.`}
-              </p>
-            )}
+            <p className="text-sm font-semibold text-gray-900">{modeInfo.label}</p>
+            <p className="text-xs text-gray-500">{modeInfo.hint}</p>
+            {isAdmin && <p className="text-xs text-gray-500 mt-1">Change it in People → Group settings.</p>}
           </div>
         )}
 
@@ -147,7 +113,7 @@ export default function SettleUpPanel({
           payMethods={payMethods}
           onRecorded={onRecorded}
           onOpenPerson={onOpenPerson}
-          isRerouted={simplify ? (s) => !realPairs.has(`${s.from_id}>${s.to_id}`) : undefined}
+          isRerouted={mode === 'fewest' ? (s) => !realPairs.has(`${s.from_id}>${s.to_id}`) : undefined}
         />
 
         {plan.length > 0 && (

@@ -49,7 +49,7 @@ set search_path = public
 as $$
   select json_build_object(
     'person_id', l.person_id,
-    'group', json_build_object('id', g.id, 'name', g.name, 'currency', g.currency, 'simplify_debts', g.simplify_debts),
+    'group', json_build_object('id', g.id, 'name', g.name, 'currency', g.currency, 'simplify_debts', g.simplify_debts, 'settle_mode', g.settle_mode),
     'members', coalesce((
       select json_agg(json_build_object('id', p.id, 'name', coalesce(m.nickname, p.full_name, split_part(p.email, '@', 1)),
                                         'pay_methods', p.pay_methods, 'upi_id', p.upi_id))

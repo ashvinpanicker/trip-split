@@ -5,12 +5,12 @@ import { Copy, ExternalLink } from 'lucide-react';
 import { LogoMark } from '@/components/Logo';
 import { useT, setLang } from '@/lib/i18n';
 import { createClient } from '@/lib/supabase/client';
-import { calculateGroupBalances, directDebts, smartSettle, formatCurrency, setActiveCurrency, type BalancePerson } from '@/lib/utils/balance';
+import { calculateGroupBalances, directDebts, settleModeOf, settlePlan, formatCurrency, setActiveCurrency, type BalancePerson } from '@/lib/utils/balance';
 import { payActions, readPayMethods } from '@/lib/utils/payMethods';
 
 type LinkData = {
   person_id: string;
-  group: { id: string; name: string; currency: string | null; simplify_debts: boolean | null };
+  group: { id: string; name: string; currency: string | null; simplify_debts: boolean | null; settle_mode?: string | null };
   members: { id: string; name: string; pay_methods: unknown; upi_id: string | null }[];
   pending: { id: string; name: string }[];
   expenses: { id: string; title: string; amount: number; date: string; paid_by: string | null; paid_by_pending: string | null;
@@ -58,7 +58,7 @@ export default function BalanceLinkPage({ params }: { params: Promise<{ token: s
   const balances = calculateGroupBalances(expenses as any, persons, data.settlements as any);
   const direct = directDebts(expenses as any, persons, data.settlements as any);
   // Same plan the app shows: simplified if the trip has that on, else pay each person back directly
-  const plan = data.group.simplify_debts ? smartSettle(balances, direct) : direct;
+  const plan = settlePlan(settleModeOf(data.group), balances, direct);
   const mine = plan.filter((s) => s.from_id === data.person_id || s.to_id === data.person_id);
   const net = balances.find((b) => b.person_id === data.person_id)?.net_balance ?? 0;
   const myShare = expenses.reduce((s, e) => s + Number(e.participants.find((p) => (p.user_id ?? p.pending_member_id) === data.person_id)?.share_amount ?? 0), 0);
