@@ -2,6 +2,7 @@
 
 import { copayNote, paidBackNote } from '@/lib/utils/paidBack';
 import { memberName } from '@/lib/utils/people';
+import { readCached } from '@/hooks/cache';
 import { enqueue, isOffline, sendPayments } from '@/lib/outbox';
 import { useT } from '@/lib/i18n';
 import { useState, useEffect } from 'react';
@@ -52,7 +53,9 @@ export default function AddExpenseModal({
   const [groups, setGroups] = useState<Group[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(initialGroupId);
   // Money in this form uses the chosen group's currency (falls back to the one on screen)
-  const cur = groups.find((g) => g.id === selectedGroupId)?.currency || getActiveCurrency();
+  const cachedTrip = selectedGroupId ? readCached<Group>(`group:${selectedGroupId}`) : undefined;
+  const tripName = groups.find((g) => g.id === selectedGroupId)?.name ?? cachedTrip?.name;
+  const cur = groups.find((g) => g.id === selectedGroupId)?.currency || cachedTrip?.currency || getActiveCurrency();
   // Paid in another currency? Shares are entered in that currency and converted to `cur` on save
   const fx0 = expense?.fx ?? null;
   const [payCur, setPayCur] = useState<string>(fx0?.currency ?? '');
@@ -110,9 +113,11 @@ export default function AddExpenseModal({
       if (!initialGroupId) {
         const { data } = await supabase
           .from('group_members')
-          .select('group:groups(id, name, description, invite_code, currency, created_at, updated_at, created_by)')
+          .select('group:groups(id, name, description, invite_code, currency, created_at, updated_at, created_by, archived_at)')
           .eq('user_id', user.id);
-        if (data) setGroups(data.map((d: any) => d.group).filter(Boolean));
+        // Offline: the trips list this phone last loaded
+        const list: Group[] = data ? data.map((d: any) => d.group).filter(Boolean) : readCached<Group[]>('groups') ?? [];
+        setGroups(list.filter((g) => !g.archived_at));
       }
     }
     init();
@@ -123,16 +128,18 @@ export default function AddExpenseModal({
   useEffect(() => {
     if (!open || !selectedGroupId) return;
     async function loadParticipants() {
-      const { data: memberData } = await supabase
-        .from('group_members')
-        .select('*, profile:profiles(id, email, full_name, avatar_url)') // * picks up weight once the trip has it
-        .eq('group_id', selectedGroupId);
-
-      const { data: pendingData } = await supabase
-        .from('pending_members')
-        .select('*')
-        .eq('group_id', selectedGroupId)
-        .is('claimed_by', null);
+      let [{ data: memberData }, { data: pendingData }] = await Promise.all([
+        supabase.from('group_members')
+          .select('*, profile:profiles(id, email, full_name, avatar_url)') // * picks up nickname and weight
+          .eq('group_id', selectedGroupId!),
+        supabase.from('pending_members').select('*').eq('group_id', selectedGroupId!).is('claimed_by', null),
+      ]);
+      // Offline: the people this phone last saw on the trip
+      if (!memberData) {
+        const cached = readCached<Group>(`group:${selectedGroupId}`);
+        memberData = (cached?.members ?? []) as any[];
+        pendingData = (cached?.pending_members ?? []).filter((p) => !p.claimed_by) as any[];
+      }
 
       const items: ParticipantEntry[] = [];
 
@@ -175,8 +182,10 @@ export default function AddExpenseModal({
   useEffect(() => {
     if (!open || !selectedGroupId) return;
     supabase.from('groups').select('fx_rates').eq('id', selectedGroupId).single().then(({ data, error }) => {
-      setFxOk(!error);
-      if (!error) setTripRates(readTripRates((data as any)?.fx_rates));
+      const cached = readCached<Group & { fx_rates?: unknown }>(`group:${selectedGroupId}`);
+      const rates = error ? cached?.fx_rates : (data as any)?.fx_rates;
+      setFxOk(rates !== undefined);
+      if (rates !== undefined) setTripRates(readTripRates(rates));
     });
     if (!expense) {
       try { setPayCur(localStorage.getItem(`tripsplit:paycur:${selectedGroupId}`) || ''); } catch {}
@@ -396,7 +405,7 @@ export default function AddExpenseModal({
           {groups.map((g) => (
             <button
               key={g.id}
-              onClick={() => { setSelectedGroupId(g.id); setStep('form'); }}
+              onClick={() => { setSelectedGroupId(g.id); setPaidBy(currentUserId); setStep('form'); }}
               className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 border border-gray-100 text-left"
             >
               <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center text-lg font-bold">
@@ -414,6 +423,15 @@ export default function AddExpenseModal({
   return (
     <Modal open={open} onClose={onClose} title={isEditing ? t('add.editTitle') : t('add.title')} size="lg">
       <form onSubmit={handleSubmit} className="p-4 space-y-4">
+        {/* Always say which trip this goes into (it isn't obvious when adding from Home) */}
+        {!isEditing && tripName && (
+          <div className="flex items-center justify-between gap-2 rounded-xl bg-blue-50 px-3 py-2 text-sm">
+            <span className="truncate text-blue-900">Adding to <span className="font-semibold">{tripName}</span></span>
+            {!initialGroupId && (
+              <button type="button" onClick={() => setStep('group')} className="shrink-0 font-medium text-blue-600">Change</button>
+            )}
+          </div>
+        )}
         <Input
           label={t('add.what')}
           placeholder={t('add.whatHint')}

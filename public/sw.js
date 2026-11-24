@@ -50,7 +50,8 @@ self.addEventListener('fetch', (event) => {
 
   // Supabase table reads → last good copy when offline
   if (url.hostname.endsWith('.supabase.co')) {
-    if (url.pathname.startsWith('/rest/v1/')) event.respondWith(networkFirst(request, DATA));
+    // Patchy signal: don't hang, use the last good copy after 5s
+    if (url.pathname.startsWith('/rest/v1/')) event.respondWith(networkFirst(request, DATA, 5000));
     return;
   }
 

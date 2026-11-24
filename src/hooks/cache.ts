@@ -50,6 +50,11 @@ export function hydrateCache() {
 export function readSavedMe<T>(): T | null {
   try { const v = localStorage.getItem(ME_KEY); return v ? (JSON.parse(v) as T) : null; } catch { return null; }
 }
+/** Read a cached value outside React (e.g. as an offline fallback). */
+export function readCached<T>(key: string): T | undefined {
+  return store.get(key) as T | undefined;
+}
+
 export function saveMe(v: unknown) {
   try { if (v) localStorage.setItem(ME_KEY, JSON.stringify(v)); else clearCache(); } catch {}
 }
