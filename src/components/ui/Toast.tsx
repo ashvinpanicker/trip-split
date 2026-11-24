@@ -1,5 +1,6 @@
 'use client';
 
+import { isNetworkError } from '@/lib/outbox';
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
 import { CheckCircle, XCircle, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
@@ -24,6 +25,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const toast = useCallback((message: string, type: ToastType = 'success') => {
+    // Raw network errors ("TypeError: Failed to fetch") become something a person understands
+    if (type === 'error' && isNetworkError(message)) message = 'No signal. Try that again when you’re back online.';
     const id = Math.random().toString(36).slice(2);
     setToasts((prev) => [...prev, { id, type, message }]);
     setTimeout(() => {

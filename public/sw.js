@@ -19,7 +19,31 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+// Save pages (and the scripts they need) so every trip opens with no signal.
+// Sent by the app while online; a page that redirects (signed out) is skipped.
+async function warm(urls) {
+  const [pages, files] = await Promise.all([caches.open(PAGES), caches.open(STATIC)]);
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, { credentials: 'same-origin' });
+      if (!cacheable(res) || !(res.headers.get('content-type') || '').includes('text/html')) continue;
+      const html = await res.clone().text();
+      await pages.put(url, res);
+      const assets = [...new Set(html.match(/\/_next\/static\/[^"'\s)]+/g) || [])];
+      for (const a of assets) {
+        if (await files.match(a)) continue;
+        const r = await fetch(a);
+        if (cacheable(r)) await files.put(a, r);
+      }
+    } catch { /* lost signal: next warm-up retries */ }
+  }
+}
+
 self.addEventListener('message', (event) => {
+  if (event.data?.type === 'warm' && Array.isArray(event.data.urls)) {
+    event.waitUntil(warm(event.data.urls.filter((u) => typeof u === 'string' && u.startsWith('/'))));
+    return;
+  }
   // Sent on sign-out so the next person on this phone can't see cached trips
   if (event.data === 'clear') {
     event.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => k.startsWith('ts-')).map((k) => caches.delete(k)))));

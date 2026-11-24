@@ -50,6 +50,12 @@ export function hydrateCache() {
 export function readSavedMe<T>(): T | null {
   try { const v = localStorage.getItem(ME_KEY); return v ? (JSON.parse(v) as T) : null; } catch { return null; }
 }
+/** Save a value outside React (offline warm-up); pages pick it up next time they open. */
+export function writeCached(key: string, value: unknown) {
+  store.set(key, value);
+  persistSoon();
+}
+
 /** Read a cached value outside React (e.g. as an offline fallback). */
 export function readCached<T>(key: string): T | undefined {
   return store.get(key) as T | undefined;

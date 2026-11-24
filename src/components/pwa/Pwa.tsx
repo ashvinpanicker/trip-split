@@ -3,6 +3,9 @@
 import { useEffect, useState } from 'react';
 import { Download, Share, WifiOff, X } from 'lucide-react';
 import { clearOutbox } from '@/lib/outbox';
+import { formatDistanceToNow } from 'date-fns';
+import { lastSynced } from '@/lib/data/warm';
+import { useOutbox } from './Sync';
 
 /** Delete cached pages and data, e.g. on sign-out so the next person on this phone sees nothing. */
 export async function clearOfflineCache() {
@@ -23,20 +26,25 @@ export function ServiceWorker() {
 
 export function OfflineBanner() {
   const [offline, setOffline] = useState(false);
+  const [synced, setSynced] = useState(0);
+  const waiting = useOutbox().length;
   useEffect(() => {
-    const update = () => setOffline(!navigator.onLine);
+    const update = () => { setOffline(!navigator.onLine); setSynced(lastSynced()); };
     update();
-    window.addEventListener('online', update);
-    window.addEventListener('offline', update);
-    return () => {
-      window.removeEventListener('online', update);
-      window.removeEventListener('offline', update);
-    };
+    for (const e of ['online', 'offline', 'tripsplit:synced']) window.addEventListener(e, update);
+    return () => { for (const e of ['online', 'offline', 'tripsplit:synced']) window.removeEventListener(e, update); };
   }, []);
   if (!offline) return null;
   return (
-    <div role="status" className="sticky top-0 z-40 flex items-center justify-center gap-2 bg-amber-100 text-amber-900 text-xs font-medium px-3 py-2">
-      <WifiOff size={14} /> Offline. You can still add expenses and payments; they sync when you're back.
+    <div role="status" className="sticky top-0 z-40 bg-amber-100 text-amber-900 text-xs px-3 py-2 text-center">
+      <p className="flex items-center justify-center gap-1.5 font-semibold">
+        <WifiOff size={14} /> Offline{synced ? ` · trips saved ${formatDistanceToNow(synced, { addSuffix: true })}` : ''}
+      </p>
+      <p>
+        {waiting
+          ? `${waiting} ${waiting === 1 ? 'change' : 'changes'} saved on this phone, sending when you’re back online.`
+          : 'Add expenses and payments as usual. They’ll sync when you’re back online.'}
+      </p>
     </div>
   );
 }

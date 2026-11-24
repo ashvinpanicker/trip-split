@@ -1,5 +1,6 @@
 'use client';
 
+import { EXPENSE_SELECT, fetchExpenses, fetchPayments } from '@/lib/data/trip';
 import { useEffect, useState, useCallback } from 'react';
 import { createClient, getAuthUser } from '@/lib/supabase/client';
 import type { Expense, ExpenseParticipant, SettlementRecord } from '@/types';
@@ -12,23 +13,8 @@ export function useExpenses(groupId: string) {
 
   const load = useCallback(async () => {
     if (!hasCached(`expenses:${groupId}`)) setLoading(true);
-    const { data } = await supabase
-      .from('expenses')
-      .select(`
-        *,
-        payer:profiles!expenses_paid_by_fkey(id, email, full_name, avatar_url, upi_id),
-        payer_pending:pending_members!expenses_paid_by_pending_fkey(id, name),
-        participants:expense_participants(
-          id, user_id, pending_member_id, share_amount, share_percentage,
-          profile:profiles(id, email, full_name, avatar_url),
-          pending_member:pending_members(id, name)
-        )
-      `)
-      .eq('group_id', groupId)
-      .order('date', { ascending: false })
-      .order('created_at', { ascending: false });
-
-    setExpenses((data || []) as Expense[]);
+    const fresh = await fetchExpenses(supabase, groupId);
+    if (fresh) setExpenses(fresh); // offline: keep what's saved
     setLoading(false);
   }, [groupId]);
   useRefreshOn(load);
@@ -60,28 +46,19 @@ export function useAllExpenses() {
         .select('group_id')
         .eq('user_id', user.id);
 
-      if (!memberships?.length) { setLoading(false); return; }
+      if (!memberships?.length) { setLoading(false); return; } // offline lands here too: keep what's saved
 
       const groupIds = memberships.map((m) => m.group_id);
 
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('expenses')
-        .select(`
-          *,
-          payer:profiles!expenses_paid_by_fkey(id, email, full_name, avatar_url),
-          payer_pending:pending_members!expenses_paid_by_pending_fkey(id, name),
-          participants:expense_participants(
-            id, user_id, pending_member_id, share_amount, share_percentage,
-            profile:profiles(id, email, full_name, avatar_url),
-            pending_member:pending_members(id, name)
-          )
-        `)
+        .select(EXPENSE_SELECT)
         .in('group_id', groupIds)
         .order('date', { ascending: false })
         .order('created_at', { ascending: false })
         .limit(50);
 
-      setExpenses((data || []) as Expense[]);
+      if (!error) setExpenses((data || []) as Expense[]); // offline: keep what's saved
       setLoading(false);
     }
     load();
@@ -99,14 +76,8 @@ export function useSettlements(groupId: string) {
   const supabase = createClient();
 
   const load = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('settlements')
-      .select('*')
-      .eq('group_id', groupId)
-      .order('date', { ascending: false })
-      .order('created_at', { ascending: false });
-    // Table missing (migration not run yet) → behave as "no payments recorded"
-    setSettlements(error ? [] : ((data || []) as SettlementRecord[]));
+    const fresh = await fetchPayments(supabase, groupId);
+    if (fresh) setSettlements(fresh); // offline: keep what's saved
   }, [groupId]);
   useRefreshOn(load);
 
@@ -136,7 +107,7 @@ export function useMyTotals() {
         supabase.from('expenses').select('id, group_id, date, paid_by, paid_by_pending, participants:expense_participants(user_id, pending_member_id, share_amount)'),
         supabase.from('settlements').select('group_id, from_person, to_person, amount'),
       ]);
-      setData({ expenses: (expenses || []) as unknown as TotalsExpense[], payments: (payments || []) as SettlementRecord[] });
+      if (expenses) setData({ expenses: expenses as unknown as TotalsExpense[], payments: (payments || []) as SettlementRecord[] });
       setLoading(false);
     }
     load();

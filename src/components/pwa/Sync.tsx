@@ -5,6 +5,7 @@ import { CloudOff } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { flushOutbox, OUTBOX_EVENT, readOutbox, type OutboxOp } from '@/lib/outbox';
 import { useToast } from '@/components/ui/Toast';
+import { warmTrips } from '@/lib/data/warm';
 import { formatCurrency } from '@/lib/utils/balance';
 
 /** Changes waiting to sync (optionally for one trip); updates live. */
@@ -40,9 +41,11 @@ export function SyncManager() {
         window.dispatchEvent(new Event('tripsplit:expenses-changed'));
       }
     };
-    const onVisible = () => { if (document.visibilityState === 'visible') sync(Date.now() - last > STALE_MS); };
-    const onOnline = () => sync(true);
-    sync(false);
+    // Keep every trip saved for no signal (at most every 10 min; forced when signal comes back)
+    const warm = (force = false) => { warmTrips(force).catch(() => {}); };
+    const onVisible = () => { if (document.visibilityState === 'visible') { sync(Date.now() - last > STALE_MS); warm(); } };
+    const onOnline = () => { sync(true).then(() => warm(true)); };
+    sync(false).then(() => warm());
     window.addEventListener('online', onOnline);
     document.addEventListener('visibilitychange', onVisible);
     return () => { window.removeEventListener('online', onOnline); document.removeEventListener('visibilitychange', onVisible); };

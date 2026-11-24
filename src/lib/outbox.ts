@@ -28,10 +28,11 @@ export function enqueue(op: NewOp) {
 }
 export function clearOutbox() { write([]); }
 
+/** The request never reached the server. */
+export const isNetworkError = (message = '') => /failed to fetch|network|load failed|fetch failed/i.test(message);
 /** No signal, or the request never reached the server. */
 export const isOffline = (error?: { message?: string } | null) =>
-  (typeof navigator !== 'undefined' && !navigator.onLine) ||
-  /failed to fetch|network|load failed|fetch failed/i.test(error?.message ?? '');
+  (typeof navigator !== 'undefined' && !navigator.onLine) || isNetworkError(error?.message);
 
 /** Insert payments; without the expense_id migration, save them without it. */
 export async function sendPayments(supabase: SupabaseClient, rows: PaymentRow[]) {

@@ -1,5 +1,6 @@
 'use client';
 
+import { fetchGroup } from '@/lib/data/trip';
 import { useEffect, useState, useCallback } from 'react';
 import { createClient, getAuthUser } from '@/lib/supabase/client';
 import type { Group } from '@/types';
@@ -57,26 +58,8 @@ export function useGroup(groupId: string) {
   const load = useCallback(async () => {
     if (!hasCached(`group:${groupId}`)) setLoading(true);
 
-    const [{ data }, { data: pendingData }] = await Promise.all([
-      supabase
-        .from('groups')
-        .select(`
-          *,
-          members:group_members(
-            *,
-            profile:profiles(id, email, full_name, avatar_url, upi_id, pay_methods)
-          )
-        `)
-        .eq('id', groupId)
-        .single(),
-      // Separate query so a missing table doesn't break the whole page
-      supabase
-        .from('pending_members')
-        .select('*')
-        .eq('group_id', groupId),
-    ]);
-
-    setGroup(data ? { ...data, pending_members: pendingData ?? [] } as Group : null);
+    const fresh = await fetchGroup(supabase, groupId);
+    if (fresh) setGroup(fresh); // offline: keep what's saved
     setLoading(false);
   }, [groupId]);
   useRefreshOn(load);
